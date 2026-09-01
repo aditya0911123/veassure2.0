@@ -1,0 +1,2 @@
+As a user, I want to list all pets so that I can see what's available.
+As a user, I want to view a pet's friend relationship.

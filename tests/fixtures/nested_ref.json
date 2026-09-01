@@ -1,0 +1,43 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Nested ref test", "version": "1.0.0" },
+  "paths": {
+    "/things": {
+      "get": {
+        "operationId": "getThing",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/A" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "A": {
+        "type": "object",
+        "properties": {
+          "b": { "$ref": "#/components/schemas/B" }
+        }
+      },
+      "B": {
+        "type": "object",
+        "properties": {
+          "c": {
+            "type": "object",
+            "properties": {
+              "deeplyNested": { "$ref": "#/components/schemas/DoesNotExist" }
+            }
+          },
+          "sibling": { "$ref": "#/components/schemas/A" }
+        }
+      }
+    }
+  }
+}
