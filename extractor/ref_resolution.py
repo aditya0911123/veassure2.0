@@ -18,9 +18,10 @@ Two separate concerns live here:
    holds a bare {"$ref": "..."} pointing at a resolvable named component,
    it's collapsed to that component's bare name string - never inlined,
    never rendered as an anonymous object. A broken $ref keeps its raw
-   {"$ref": "..."} form (warnings for these are reported once,
-   comprehensively, by resolve_with_prance's whole-document pre-scan - not
-   re-logged per occurrence here). Everything else (plain inline structure
+   {"$ref": "...", "unresolvable": true} form - the extra flag marks the
+   exact spot inline, in addition to the summary in warnings (reported
+   once, comprehensively, by resolve_with_prance's whole-document
+   pre-scan - not re-logged per occurrence here). Everything else (plain inline structure
    with no $ref at that position) is copied from the RESOLVED spec instead,
    so accuracy of nested/derived content still benefits from prance's
    resolution. Recursion stops the instant a $ref is found - the walker
@@ -148,8 +149,9 @@ def build_clean_view(
             return ref_target_name(ref)
         # Broken refs are reported once, comprehensively, by
         # resolve_with_prance's whole-document pre-scan - not re-logged
-        # here, to avoid duplicate/partial-coverage warnings.
-        return {"$ref": ref}
+        # here, to avoid duplicate/partial-coverage warnings. The inline
+        # marker below is what flags the exact spot in the JSON output.
+        return {"$ref": ref, "unresolvable": True}
 
     if isinstance(raw_node, dict):
         resolved_dict = resolved_node if isinstance(resolved_node, dict) else {}

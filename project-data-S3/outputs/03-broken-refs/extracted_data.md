@@ -36,7 +36,7 @@
 - security: null
 - parameters: [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string"}}]
 - request_body: null
-- responses: {"200": {"description": "Invoice document", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Invoice"}}}}}
+- responses: {"200": {"description": "Invoice document", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Invoice", "unresolvable": true}}}}}
 
 ## Schemas
 
@@ -50,7 +50,8 @@
     },
     "customer": "Customer",
     "shippingLabel": {
-      "$ref": "#/components/schemas/ShippingLabel"
+      "$ref": "#/components/schemas/ShippingLabel",
+      "unresolvable": true
     }
   },
   "required": [

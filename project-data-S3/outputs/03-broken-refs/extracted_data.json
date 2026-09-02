@@ -62,7 +62,8 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Invoice"
+                "$ref": "#/components/schemas/Invoice",
+                "unresolvable": true
               }
             }
           }
@@ -79,7 +80,8 @@
         },
         "customer": "Customer",
         "shippingLabel": {
-          "$ref": "#/components/schemas/ShippingLabel"
+          "$ref": "#/components/schemas/ShippingLabel",
+          "unresolvable": true
         }
       },
       "required": [
