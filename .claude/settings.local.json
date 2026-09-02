@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"./.venv/Scripts/python.exe\" -m pip install --quiet prance)",
+      "Bash(\"./.venv/Scripts/python.exe\" -c \"import prance; print\\(prance.__version__ if hasattr\\(prance,'__version__'\\) else 'n/a'\\); print\\([x for x in dir\\(prance\\) if not x.startswith\\('_'\\)]\\)\")"
+    ]
+  }
+}

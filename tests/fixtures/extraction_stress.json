@@ -1,0 +1,67 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Extraction stress test", "version": "1.0.0" },
+  "paths": {
+    "/animals": {
+      "get": {
+        "operationId": "listAnimals",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Dog" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/broken": {
+      "get": {
+        "operationId": "getBroken",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Nowhere" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Animal": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        },
+        "required": ["name"]
+      },
+      "Dog": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Animal" },
+          {
+            "type": "object",
+            "properties": {
+              "breed": { "type": "string" },
+              "owner": { "$ref": "#/components/schemas/Owner" }
+            }
+          }
+        ]
+      },
+      "Owner": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "notes": { "$ref": "#/components/schemas/GhostSchema" }
+        }
+      },
+      "SelfRef": { "$ref": "#/components/schemas/SelfRef" }
+    }
+  }
+}

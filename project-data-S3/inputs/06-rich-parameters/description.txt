@@ -1,0 +1,17 @@
+Test case: parameter merging and multiple response codes.
+
+What this covers:
+- Path-level "parameters" (index: path, X-Request-Id: header) declared
+  once on /search/{index}, shared by every method on that path - merged
+  with the GET operation's own parameters (q: query, limit: query,
+  session: cookie). Exercises all four "in" locations in one endpoint.
+- Four response codes on one operation (200, 400, 404, 500), with 400/
+  404/500 all reusing the same named Error schema - tests that a schema
+  referenced from multiple response codes on the same endpoint still
+  collapses to the same name each time, not duplicated/expanded.
+- No userstories.txt (no-user-stories path).
+
+Expected extraction result: Hard Gates pass cleanly, zero warnings. The
+"search" endpoint's parameters array should contain all 5 parameters
+(2 path-level + 3 operation-level) merged into one list. All three error
+responses should show "schema": "Error".

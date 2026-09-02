@@ -1,0 +1,4 @@
+As a shopper, I want to see a list of all books so that I can browse the catalog.
+As a shopper, I want to view a single book's details before buying it.
+As an admin, I want to add new books to the catalog.
+As an admin, I want to remove books that are no longer sold.

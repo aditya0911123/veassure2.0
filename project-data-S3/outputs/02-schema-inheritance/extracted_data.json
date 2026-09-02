@@ -1,0 +1,153 @@
+{
+  "metadata": {
+    "title": "Fleet API",
+    "version": "1.0.0",
+    "description": "Tests allOf-based schema composition/inheritance, two levels deep.",
+    "contact": null,
+    "license": null,
+    "servers": [],
+    "tags": []
+  },
+  "security": {
+    "schemes": {},
+    "global_requirements": []
+  },
+  "endpoints": [
+    {
+      "path": "/vehicles",
+      "method": "GET",
+      "operationId": "listVehicles",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": null,
+      "parameters": [],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "All vehicles",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": "Vehicle"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/vehicles/cars",
+      "method": "GET",
+      "operationId": "listCars",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": null,
+      "parameters": [],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "All cars",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": "Car"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/vehicles/sports-cars",
+      "method": "GET",
+      "operationId": "listSportsCars",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": null,
+      "parameters": [],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "All sports cars",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": "SportsCar"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "schemas": {
+    "Vehicle": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "make": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "make",
+        "model"
+      ]
+    },
+    "Car": {
+      "allOf": [
+        "Vehicle",
+        {
+          "type": "object",
+          "properties": {
+            "doors": {
+              "type": "integer"
+            },
+            "fuelType": {
+              "type": "string",
+              "enum": [
+                "petrol",
+                "diesel",
+                "electric",
+                "hybrid"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "SportsCar": {
+      "allOf": [
+        "Car",
+        {
+          "type": "object",
+          "properties": {
+            "topSpeedKph": {
+              "type": "number"
+            },
+            "zeroToHundredSeconds": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "topSpeedKph"
+          ]
+        }
+      ]
+    }
+  },
+  "user_stories": null,
+  "warnings": []
+}

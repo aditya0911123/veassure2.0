@@ -1,0 +1,14 @@
+Test case: schema composition / inheritance chains.
+
+What this covers:
+- Two levels of allOf-based inheritance: SportsCar extends Car extends
+  Vehicle, each via allOf referencing the parent by $ref.
+- No userstories.txt on purpose - tests the "no user stories" path
+  (extracted_data.json's user_stories field should be null).
+- Array response bodies (items: $ref) as another shape of schema
+  reference, distinct from the direct object refs used in 01-basic-crud.
+
+Expected extraction result: Hard Gates pass cleanly, zero warnings.
+Car.allOf should show ["Vehicle", {...doors/fuelType...}] and SportsCar's
+allOf should show ["Car", {...topSpeedKph...}] - the parent schema name
+preserved at each level, not flattened/inlined.

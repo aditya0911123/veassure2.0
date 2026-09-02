@@ -1,0 +1,21 @@
+Test case: security schemes, global vs. per-endpoint overrides, full metadata.
+
+What this covers:
+- Three security scheme types in components.securitySchemes: apiKey
+  (header), http bearer (JWT), and oauth2 (implicit flow with scopes).
+- A global security requirement (bearerAuth) that most endpoints inherit
+  implicitly (no "security" key on the operation itself).
+- POST /payments overrides with a DIFFERENT requirement (oauth2 scopes).
+- GET /health explicitly opts out with security: [] (distinct from an
+  endpoint that simply omits "security" and inherits the global one).
+- Full metadata block: contact and license populated (most other test
+  cases leave these null), to test that path too.
+- Includes userstories.txt.
+
+Expected extraction result: Hard Gates pass cleanly, zero warnings. The
+top-level "security" section should list all three schemes plus the
+global requirement. Per-endpoint, listPayments.security should be null
+(inherits global), createPayment.security should show the oauth2
+override, and healthCheck.security should be an explicit empty list -
+these three states should be distinguishable in the output, not
+collapsed into the same thing.

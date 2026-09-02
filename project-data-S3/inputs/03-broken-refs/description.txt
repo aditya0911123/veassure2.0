@@ -1,0 +1,20 @@
+Test case: broken/unresolvable $refs, both direct and transitive.
+
+What this covers:
+- A direct broken ref at endpoint level: GET /orders/{orderId}/invoice
+  responds with $ref to "Invoice", which does not exist anywhere in
+  components.schemas.
+- A broken ref nested inside a schema definition: Order.shippingLabel
+  points at "ShippingLabel", which also doesn't exist. This one is only
+  reachable transitively - GET /orders uses Order, and Order embeds the
+  broken ref - not a direct ref on the endpoint itself.
+- Includes userstories.txt (with-user-stories path).
+
+Expected extraction result: extracted_data.json's warnings array should
+have exactly 2 entries (both "Unresolvable $ref: ..."), and both broken
+$ref spots should keep their raw {"$ref": "..."} form rather than a name
+string. In extracted_data.md's Broken $ref Summary, BOTH endpoints should
+be listed as affected - GET /orders/{orderId}/invoice (direct) and
+GET /orders (transitive, via Order -> shippingLabel) - proving the
+affected-endpoints computation follows references through a schema's own
+body, not just an endpoint's immediate refs.

@@ -1,0 +1,107 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payments API",
+    "version": "1.0.0",
+    "description": "Tests multiple security scheme types, a global requirement, and a per-endpoint override.",
+    "contact": { "name": "API Support", "email": "support@example.com" },
+    "license": { "name": "Apache 2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0.html" }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/payments": {
+      "get": {
+        "operationId": "listPayments",
+        "responses": {
+          "200": {
+            "description": "All payments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Payment" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPayment",
+        "security": [{ "oauth2": ["payments:write"] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PaymentInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Payment" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "security": [],
+        "responses": {
+          "200": { "description": "Service is healthy" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "implicit": {
+            "authorizationUrl": "https://auth.example.com/authorize",
+            "scopes": {
+              "payments:read": "Read payment data",
+              "payments:write": "Create and modify payments"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "amountCents": { "type": "integer", "minimum": 0 },
+          "currency": { "type": "string", "enum": ["USD", "EUR", "GBP"] }
+        },
+        "required": ["id", "amountCents", "currency"]
+      },
+      "PaymentInput": {
+        "type": "object",
+        "properties": {
+          "amountCents": { "type": "integer", "minimum": 0 },
+          "currency": { "type": "string", "enum": ["USD", "EUR", "GBP"] }
+        },
+        "required": ["amountCents", "currency"]
+      }
+    }
+  }
+}

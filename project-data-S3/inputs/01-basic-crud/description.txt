@@ -1,0 +1,16 @@
+Test case: baseline happy path.
+
+What this covers:
+- A plain CRUD API (Bookstore) with no schema composition, no broken refs,
+  no recursive schemas.
+- Multiple HTTP methods on the same path (/books: GET + POST) and a
+  path-parameterized route (/books/{bookId}: GET + DELETE).
+- A path parameter, a request body, and multiple response codes (200,
+  201, 204, 404) including a response with no content schema.
+- Two named schemas (Book, BookInput) referenced by name from different
+  endpoints - exercises basic $ref -> name collapsing with no edge cases.
+- Includes userstories.txt to test the "with user stories" path.
+
+Expected extraction result: everything passes Hard Gates cleanly, zero
+warnings, all endpoint schema references show up as plain name strings
+("Book", "BookInput").

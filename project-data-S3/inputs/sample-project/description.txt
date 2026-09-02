@@ -1,0 +1,13 @@
+Test case: valid self-referencing schema via a direct property (not array items).
+
+What this covers:
+- Pet.friend is a direct $ref back to Pet itself (as opposed to
+  04-recursive-schema's Comment.replies, which recurses through an array
+  items wrapper instead) - a different recursion shape to exercise the
+  same cycle guard.
+- Includes userstories.txt.
+- This was the first sample project built while developing Part 1/Part 2;
+  kept as the baseline "does the whole pipeline still work" smoke test.
+
+Expected extraction result: Hard Gates pass cleanly, zero warnings.
+Pet.properties.friend should show up as the bare string "Pet".

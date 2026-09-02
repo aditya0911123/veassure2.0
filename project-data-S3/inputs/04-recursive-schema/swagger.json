@@ -1,0 +1,48 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Comments API",
+    "version": "1.0.0",
+    "description": "Tests a self-referencing schema via array items, a different recursion shape than a direct self-ref property."
+  },
+  "paths": {
+    "/posts/{postId}/comments": {
+      "get": {
+        "operationId": "listComments",
+        "parameters": [
+          { "name": "postId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Top-level comments, each with nested replies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Comment" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "author": { "type": "string" },
+          "body": { "type": "string" },
+          "replies": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Comment" }
+          }
+        },
+        "required": ["id", "author", "body"]
+      }
+    }
+  }
+}

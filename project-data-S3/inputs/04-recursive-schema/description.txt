@@ -1,0 +1,15 @@
+Test case: valid recursive schema (self-reference through array items).
+
+What this covers:
+- Comment.replies is an array of Comment - a self-referencing schema, but
+  via "items: $ref" rather than a direct property $ref (different shape
+  than the Pet.friend -> Pet case already covered elsewhere), and NOT a
+  bare self-ref (Comment has real structure alongside the recursive
+  point, so it also passes Hard Gates cleanly - unlike the degenerate
+  bare self-ref case, which fails Gate 3 by design).
+- No userstories.txt (no-user-stories path).
+
+Expected extraction result: Hard Gates pass cleanly, zero warnings.
+Comment.properties.replies.items should show up as the bare string
+"Comment" - proving the cycle guard stops at the $ref boundary instead of
+trying to infinitely expand the recursive structure.

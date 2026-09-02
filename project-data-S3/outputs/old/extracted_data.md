@@ -1,0 +1,200 @@
+# Extracted API Data
+
+## Metadata
+
+- Title: "User Management API"
+- Version: "1.0.0"
+- Description: "API for managing users - create, update, delete, and query user profiles."
+- Contact: {"name": "API Support", "email": "support@example.com"}
+- License: {"name": "Apache 2.0", "url": "http://www.apache.org/licenses/LICENSE-2.0"}
+- Servers: [{"url": "http://localhost:8080", "description": "Local development server"}]
+- Tags: [{"name": "User Management", "description": "Operations for creating and managing user accounts"}]
+
+## Security
+
+- Global requirements: [{"BearerAuth": []}]
+- Schemes:
+  - BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "JWT Authorization header. Example: Authorization: Bearer <token>"}
+
+## Endpoints
+
+### GET /api/v1/private/user/profile
+- operationId: "getAuthUser"
+- summary: "Get authenticated user profile"
+- description: "Returns the full profile of the currently authenticated user, derived from the JWT Bearer token. The response includes computed fields such as groups (with IDs), permissions, loginTime, and lastAccess. Sensitive fields such as password and repeatPassword are never returned."
+- tags: ["User Management"]
+- security: [{"BearerAuth": []}]
+- parameters: [{"name": "lang", "in": "query", "description": "Two-letter language code for the response locale, e.g. en, fr", "required": false, "schema": {"type": "string", "example": "en"}}]
+- request_body: null
+- responses: {"200": {"description": "Authenticated user profile returned successfully", "content": {"application/json": {"schema": "ReadableUser", "example": {"id": 1, "firstName": "Administrator", "lastName": "User", "emailAddress": "admin@shopizer.com", "defaultLanguage": "en", "userName": "admin@shopizer.com", "active": true, "lastAccess": null, "loginTime": null, "merchant": "DEFAULT", "permissions": [{"id": 1, "name": "AUTH"}, {"id": 2, "name": "SUPERADMIN"}, {"id": 3, "name": "ADMIN"}, {"id": 4, "name": "PRODUCTS"}, {"id": 5, "name": "ORDER"}, {"id": 6, "name": "CONTENT"}, {"id": 7, "name": "STORE"}, {"id": 8, "name": "TAX"}, {"id": 9, "name": "PAYMENT"}, {"id": 10, "name": "CUSTOMER"}, {"id": 11, "name": "SHIPPING"}], "groups": [{"name": "SUPERADMIN", "type": null, "id": 1}, {"name": "ADMIN", "type": null, "id": 2}]}}}}, "401": {"description": "Unauthorized - no Authorization header or Bearer token was provided in the request", "content": {"application/json": {"schema": "ErrorResponse", "example": {"timestamp": "2026-07-16T05:36:32.484+0000", "status": 401, "error": "Unauthorized", "path": "/api/v1/private/user/profile"}}}}, "500": {"description": "Internal Server Error - returned for invalid, expired, tampered, or malformed Bearer token, or unexpected server failures", "content": {"application/json": {"schema": "ErrorResponse", "examples": {"invalidToken": {"summary": "Invalid, tampered, or malformed Bearer token", "value": {"timestamp": "2026-07-16T05:42:59.578+0000", "status": 500, "error": "Internal Server Error", "path": "/api/v1/private/user/profile"}}, "expiredToken": {"summary": "Expired JWT Bearer token", "value": {"timestamp": "2026-07-16T05:42:59.578+0000", "status": 500, "error": "Internal Server Error", "path": "/api/v1/private/user/profile"}}, "unexpectedError": {"summary": "Unexpected server failure", "value": {"timestamp": "2026-07-16T05:42:59.578+0000", "status": 500, "error": "Internal Server Error", "path": "/api/v1/private/user/profile"}}}}}}}
+
+## Schemas
+
+### ReadableUser
+```json
+{
+  "type": "object",
+  "description": "User profile returned by the API. Never contains password or repeatPassword fields.",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "format": "int64",
+      "description": "Auto-generated user ID",
+      "example": 1
+    },
+    "firstName": {
+      "type": "string",
+      "description": "User first name",
+      "example": "Administrator"
+    },
+    "lastName": {
+      "type": "string",
+      "description": "User last name",
+      "example": "User"
+    },
+    "emailAddress": {
+      "type": "string",
+      "format": "email",
+      "description": "User email address",
+      "example": "admin@shopizer.com"
+    },
+    "defaultLanguage": {
+      "type": "string",
+      "description": "Two-letter ISO 639-1 language code",
+      "example": "en"
+    },
+    "userName": {
+      "type": "string",
+      "description": "Unique username / login name",
+      "example": "admin@shopizer.com"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the account is active",
+      "example": true
+    },
+    "lastAccess": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "ISO 8601 timestamp of last API access. Null for newly created users",
+      "example": null
+    },
+    "loginTime": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true,
+      "description": "ISO 8601 timestamp of last login. Null for newly created users",
+      "example": null
+    },
+    "merchant": {
+      "type": "string",
+      "description": "Store / merchant code - corresponds to the store field sent on create",
+      "example": "DEFAULT"
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Permissions computed as the union of all permissions from the user assigned groups",
+      "items": "ReadablePermission"
+    },
+    "groups": {
+      "type": "array",
+      "description": "Groups assigned to the user, enriched with IDs from the system. The type field may be null.",
+      "items": "ReadableGroup"
+    }
+  }
+}
+```
+
+### ReadableGroup
+```json
+{
+  "type": "object",
+  "description": "Group / role as returned by the API. The type field is nullable and may be returned as null by the server.",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "format": "int64",
+      "description": "System-assigned group ID",
+      "example": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "Group name",
+      "example": "SUPERADMIN"
+    },
+    "type": {
+      "type": "string",
+      "nullable": true,
+      "description": "Group type - may be null as returned by the server",
+      "example": null
+    }
+  }
+}
+```
+
+### ReadablePermission
+```json
+{
+  "type": "object",
+  "description": "Individual permission entry derived from group membership",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "format": "int32",
+      "description": "System-assigned permission ID",
+      "example": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "Permission name",
+      "example": "AUTH"
+    }
+  }
+}
+```
+
+### ErrorResponse
+```json
+{
+  "type": "object",
+  "description": "Standard error response returned by the Shopizer API for 401 and 500 errors",
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the error occurred",
+      "example": "2026-07-16T05:36:32.484+0000"
+    },
+    "status": {
+      "type": "integer",
+      "format": "int32",
+      "description": "HTTP status code",
+      "example": 401
+    },
+    "error": {
+      "type": "string",
+      "description": "Short human-readable error label",
+      "example": "Unauthorized"
+    },
+    "path": {
+      "type": "string",
+      "description": "The request path that triggered the error",
+      "example": "/api/v1/private/user/profile"
+    }
+  }
+}
+```
+
+## User Stories
+
+(none provided)
+
+## Warnings
+
+- none
+
+## Broken $ref Summary
+
+- Total broken $ref occurrences: 0
+- Affected endpoints: 0
