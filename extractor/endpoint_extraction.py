@@ -45,6 +45,15 @@ def extract_endpoints(
             raw_parameters = raw_shared_params + raw_operation.get("parameters", [])
             resolved_parameters = resolved_shared_params + resolved_operation.get("parameters", [])
 
+            # No "security" key at all means "inherits the global
+            # requirement" - an explicit [] means "no auth required".
+            # These are different things; the raw None from .get() would
+            # collapse them both into "null" for a downstream consumer
+            # with no way to tell them apart without knowing the OpenAPI
+            # convention, so the distinction is spelled out explicitly.
+            operation_security = raw_operation.get("security")
+            security = "inherits_global" if operation_security is None else operation_security
+
             entry = {
                 "path": path,
                 "method": method.upper(),
@@ -52,7 +61,7 @@ def extract_endpoints(
                 "summary": raw_operation.get("summary"),
                 "description": raw_operation.get("description"),
                 "tags": raw_operation.get("tags", []),
-                "security": raw_operation.get("security"),
+                "security": security,
                 "parameters": build_clean_view(
                     raw_parameters, resolved_parameters, raw_spec, f"{base_path}.parameters", warnings
                 ),

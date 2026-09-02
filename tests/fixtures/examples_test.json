@@ -1,0 +1,62 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Examples test",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/widgets": {
+      "post": {
+        "operationId": "createWidget",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "name": "inline-example-widget"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "examples": {
+                  "basic": {
+                    "summary": "A basic widget",
+                    "value": {
+                      "name": "foo"
+                    }
+                  },
+                  "advanced": {
+                    "summary": "A widget with extras",
+                    "value": {
+                      "name": "bar",
+                      "extra": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}

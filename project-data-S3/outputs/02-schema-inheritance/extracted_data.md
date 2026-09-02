@@ -5,16 +5,19 @@
 - Title: "Fleet API"
 - Version: "1.0.0"
 - Description: "Tests allOf-based schema composition/inheritance, two levels deep."
-- Contact: null
-- License: null
-- Servers: []
-- Tags: []
+- Contact: (none)
+- License: (none)
+- Servers:
+  - (none)
+- Tags:
+  - (none)
 
 ## Security
 
-- Global requirements: []
+- Global requirements:
+  - (none)
 - Schemes:
-  - none
+  - (none)
 
 ## Endpoints
 
@@ -23,7 +26,7 @@
 - summary: null
 - description: null
 - tags: []
-- security: null
+- Security: Inherits global security
 - Parameters:
   - (none)
 - Request body:
@@ -37,7 +40,7 @@
 - summary: null
 - description: null
 - tags: []
-- security: null
+- Security: Inherits global security
 - Parameters:
   - (none)
 - Request body:
@@ -51,7 +54,7 @@
 - summary: null
 - description: null
 - tags: []
-- security: null
+- Security: Inherits global security
 - Parameters:
   - (none)
 - Request body:
@@ -72,7 +75,7 @@
 ### Car
 - Composition: allOf
   - extends `Vehicle`
-  - inline schema:
+  - inline extends:
     - Type: object
     - Properties:
       - **doors**: integer
@@ -82,7 +85,7 @@
 ### SportsCar
 - Composition: allOf
   - extends `Car`
-  - inline schema:
+  - inline extends:
     - Type: object
     - Properties:
       - **topSpeedKph**: number *(required)*

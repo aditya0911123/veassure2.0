@@ -1,0 +1,110 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Verification Suite", "version": "1.0.0" },
+  "paths": {
+    "/demo": {
+      "get": {
+        "operationId": "getDemo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AllOfChild" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AllOfParent": {
+        "type": "object",
+        "properties": { "id": { "type": "string" } },
+        "required": ["id"]
+      },
+      "AllOfChild": {
+        "allOf": [
+          { "$ref": "#/components/schemas/AllOfParent" },
+          {
+            "type": "object",
+            "properties": { "extra": { "type": "string" } }
+          }
+        ]
+      },
+
+      "ChainA": {
+        "type": "object",
+        "properties": { "link": { "$ref": "#/components/schemas/ChainB" } }
+      },
+      "ChainB": {
+        "type": "object",
+        "properties": { "link": { "$ref": "#/components/schemas/ChainC" } }
+      },
+      "ChainC": {
+        "type": "object",
+        "properties": { "value": { "type": "string" } }
+      },
+
+      "CycleA": {
+        "type": "object",
+        "properties": { "b": { "$ref": "#/components/schemas/CycleB" } }
+      },
+      "CycleB": {
+        "type": "object",
+        "properties": { "backToA": { "$ref": "#/components/schemas/CycleA" } }
+      },
+
+      "AnyOfExample": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/ChainC" },
+              { "type": "integer" },
+              { "type": "boolean" }
+            ]
+          }
+        }
+      },
+
+      "OneOfExample": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/CycleA" },
+              { "type": "string", "enum": ["placeholder", "unset"] }
+            ]
+          }
+        }
+      },
+
+      "EnumExample": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive", "pending", "archived"]
+          }
+        }
+      },
+
+      "MixedComposition": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ChainC" }
+        ],
+        "type": "object",
+        "properties": {
+          "ownField": { "type": "string" },
+          "brokenField": { "$ref": "#/components/schemas/DoesNotExistAnywhere" }
+        },
+        "required": ["ownField"]
+      },
+
+      "BareSelfRef": { "$ref": "#/components/schemas/BareSelfRef" }
+    }
+  }
+}

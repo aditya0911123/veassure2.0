@@ -5,16 +5,19 @@
 - Title: "Order API"
 - Version: "1.0.0"
 - Description: "Tests broken/unresolvable $refs at both endpoint level and nested inside a schema."
-- Contact: null
-- License: null
-- Servers: []
-- Tags: []
+- Contact: (none)
+- License: (none)
+- Servers:
+  - (none)
+- Tags:
+  - (none)
 
 ## Security
 
-- Global requirements: []
+- Global requirements:
+  - (none)
 - Schemes:
-  - none
+  - (none)
 
 ## Endpoints
 
@@ -23,7 +26,7 @@
 - summary: null
 - description: null
 - tags: []
-- security: null
+- Security: Inherits global security
 - Parameters:
   - (none)
 - Request body:
@@ -37,7 +40,7 @@
 - summary: null
 - description: null
 - tags: []
-- security: null
+- Security: Inherits global security
 - Parameters:
   - **orderId** (path, required): string
 - Request body:

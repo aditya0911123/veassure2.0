@@ -5,16 +5,23 @@
 - Title: "User Management API"
 - Version: "1.0.0"
 - Description: "API for managing users - create, update, delete, and query user profiles."
-- Contact: {"name": "API Support", "email": "support@example.com"}
-- License: {"name": "Apache 2.0", "url": "http://www.apache.org/licenses/LICENSE-2.0"}
-- Servers: [{"url": "http://localhost:8080", "description": "Local development server"}]
-- Tags: [{"name": "User Management", "description": "Operations for creating and managing user accounts"}]
+- Contact: API Support (support@example.com)
+- License: Apache 2.0 — http://www.apache.org/licenses/LICENSE-2.0
+- Servers:
+  - http://localhost:8080 — Local development server
+- Tags:
+  - User Management — Operations for creating and managing user accounts
 
 ## Security
 
-- Global requirements: [{"BearerAuth": []}]
+- Global requirements:
+  - BearerAuth
 - Schemes:
-  - BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "JWT Authorization header. Example: Authorization: Bearer <token>"}
+  - **BearerAuth**
+    - Type: http
+    - Scheme: bearer
+    - Bearer format: JWT
+    - Description: JWT Authorization header. Example: Authorization: Bearer <token>
 
 ## Endpoints
 
@@ -23,7 +30,8 @@
 - summary: "Get authenticated user profile"
 - description: "Returns the full profile of the currently authenticated user, derived from the JWT Bearer token. The response includes computed fields such as groups (with IDs), permissions, loginTime, and lastAccess. Sensitive fields such as password and repeatPassword are never returned."
 - tags: ["User Management"]
-- security: [{"BearerAuth": []}]
+- Security:
+  - BearerAuth
 - Parameters:
   - **lang** (query, optional): string
     - Description: Two-letter language code for the response locale, e.g. en, fr
@@ -36,6 +44,15 @@
     - application/json: `ErrorResponse`
   - **500**: Internal Server Error - returned for invalid, expired, tampered, or malformed Bearer token, or unexpected server failures
     - application/json: `ErrorResponse`
+- Examples:
+  - Response 200 (application/json):
+    - {"id": 1, "firstName": "Administrator", "lastName": "User", "emailAddress": "admin@shopizer.com", "defaultLanguage": "en", "userName": "admin@shopizer.com", "active": true, "lastAccess": null, "loginTime": null, "merchant": "DEFAULT", "permissions": [{"id": 1, "name": "AUTH"}, {"id": 2, "name": "SUPERADMIN"}, {"id": 3, "name": "ADMIN"}, {"id": 4, "name": "PRODUCTS"}, {"id": 5, "name": "ORDER"}, {"id": 6, "name": "CONTENT"}, {"id": 7, "name": "STORE"}, {"id": 8, "name": "TAX"}, {"id": 9, "name": "PAYMENT"}, {"id": 10, "name": "CUSTOMER"}, {"id": 11, "name": "SHIPPING"}], "groups": [{"name": "SUPERADMIN", "type": null, "id": 1}, {"name": "ADMIN", "type": null, "id": 2}]}
+  - Response 401 (application/json):
+    - {"timestamp": "2026-07-16T05:36:32.484+0000", "status": 401, "error": "Unauthorized", "path": "/api/v1/private/user/profile"}
+  - Response 500 (application/json):
+    - **invalidToken**: Invalid, tampered, or malformed Bearer token — {"timestamp": "2026-07-16T05:42:59.578+0000", "status": 500, "error": "Internal Server Error", "path": "/api/v1/private/user/profile"}
+    - **expiredToken**: Expired JWT Bearer token — {"timestamp": "2026-07-16T05:42:59.578+0000", "status": 500, "error": "Internal Server Error", "path": "/api/v1/private/user/profile"}
+    - **unexpectedError**: Unexpected server failure — {"timestamp": "2026-07-16T05:42:59.578+0000", "status": 500, "error": "Internal Server Error", "path": "/api/v1/private/user/profile"}
 
 ## Schemas
 

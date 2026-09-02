@@ -5,16 +5,19 @@
 - Title: "Search API"
 - Version: "1.0.0"
 - Description: "Tests path-level shared parameters merged with operation-level parameters across all 'in' locations, plus multiple response codes."
-- Contact: null
-- License: null
-- Servers: []
-- Tags: []
+- Contact: (none)
+- License: (none)
+- Servers:
+  - (none)
+- Tags:
+  - (none)
 
 ## Security
 
-- Global requirements: []
+- Global requirements:
+  - (none)
 - Schemes:
-  - none
+  - (none)
 
 ## Endpoints
 
@@ -23,7 +26,7 @@
 - summary: null
 - description: null
 - tags: []
-- security: null
+- Security: Inherits global security
 - Parameters:
   - **index** (path, required): string
     - Description: Shared across every method on this path
@@ -51,6 +54,8 @@
 - Properties:
   - **total**: integer *(required)*
   - **items**: array of object *(required)*
+    - Items:
+      - Type: object
 
 ### Error
 - Type: object

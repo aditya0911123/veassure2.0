@@ -1,0 +1,174 @@
+{
+  "metadata": {
+    "title": "Payments API",
+    "version": "1.0.0",
+    "description": "Tests multiple security scheme types, a global requirement, and a per-endpoint override.",
+    "contact": {
+      "name": "API Support",
+      "email": "support@example.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "servers": [],
+    "tags": []
+  },
+  "security": {
+    "schemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "implicit": {
+            "authorizationUrl": "https://auth.example.com/authorize",
+            "scopes": {
+              "payments:read": "Read payment data",
+              "payments:write": "Create and modify payments"
+            }
+          }
+        }
+      }
+    },
+    "global_requirements": [
+      {
+        "bearerAuth": []
+      }
+    ]
+  },
+  "endpoints": [
+    {
+      "path": "/payments",
+      "method": "GET",
+      "operationId": "listPayments",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": "inherits_global",
+      "parameters": [],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "All payments",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": "Payment"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/payments",
+      "method": "POST",
+      "operationId": "createPayment",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": [
+        {
+          "oauth2": [
+            "payments:write"
+          ]
+        }
+      ],
+      "parameters": [],
+      "request_body": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": "PaymentInput"
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Payment created",
+          "content": {
+            "application/json": {
+              "schema": "Payment"
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/health",
+      "method": "GET",
+      "operationId": "healthCheck",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": [],
+      "parameters": [],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "Service is healthy"
+        }
+      }
+    }
+  ],
+  "schemas": {
+    "Payment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "amountCents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "enum": [
+            "USD",
+            "EUR",
+            "GBP"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "amountCents",
+        "currency"
+      ]
+    },
+    "PaymentInput": {
+      "type": "object",
+      "properties": {
+        "amountCents": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "enum": [
+            "USD",
+            "EUR",
+            "GBP"
+          ]
+        }
+      },
+      "required": [
+        "amountCents",
+        "currency"
+      ]
+    }
+  },
+  "user_stories": "As an authenticated user, I want to list my payments.\nAs an authenticated app (via OAuth2), I want to create a payment on a user's behalf.\nAs an operator, I want to check service health without authenticating.\n",
+  "warnings": []
+}

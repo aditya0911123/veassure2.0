@@ -14,8 +14,9 @@ What this covers:
 
 Expected extraction result: Hard Gates pass cleanly, zero warnings. The
 top-level "security" section should list all three schemes plus the
-global requirement. Per-endpoint, listPayments.security should be null
-(inherits global), createPayment.security should show the oauth2
-override, and healthCheck.security should be an explicit empty list -
-these three states should be distinguishable in the output, not
-collapsed into the same thing.
+global requirement. Per-endpoint, listPayments.security should be the
+string "inherits_global" (no "security" key on the operation itself),
+createPayment.security should show the oauth2 override as a real
+requirement list, and healthCheck.security should be an explicit empty
+list [] - these three states must be distinguishable in the output, not
+collapsed into the same null value.

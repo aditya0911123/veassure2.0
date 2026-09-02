@@ -2,92 +2,59 @@
 
 ## Metadata
 
-- Title: "Order API"
+- Title: "Sample API"
 - Version: "1.0.0"
-- Description: "Tests broken/unresolvable $refs at both endpoint level and nested inside a schema."
-- Contact: null
-- License: null
-- Servers: []
-- Tags: []
+- Description: null
+- Contact: (none)
+- License: (none)
+- Servers:
+  - (none)
+- Tags:
+  - (none)
 
 ## Security
 
-- Global requirements: []
+- Global requirements:
+  - (none)
 - Schemes:
-  - none
+  - (none)
 
 ## Endpoints
 
-### GET /orders
-- operationId: "listOrders"
+### GET /pets
+- operationId: "listPets"
 - summary: null
 - description: null
 - tags: []
-- security: null
-- parameters: []
-- request_body: null
-- responses: {"200": {"description": "All orders", "content": {"application/json": {"schema": {"type": "array", "items": "Order"}}}}}
-
-### GET /orders/{orderId}/invoice
-- operationId: "getOrderInvoice"
-- summary: null
-- description: null
-- tags: []
-- security: null
-- parameters: [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string"}}]
-- request_body: null
-- responses: {"200": {"description": "Invoice document", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Invoice"}}}}}
+- Security: Inherits global security
+- Parameters:
+  - (none)
+- Request body:
+  - (none)
+- Responses:
+  - **200**: OK
+    - application/json: `Pet`
 
 ## Schemas
 
-### Order
-```json
-{
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "string"
-    },
-    "customer": "Customer",
-    "shippingLabel": {
-      "$ref": "#/components/schemas/ShippingLabel"
-    }
-  },
-  "required": [
-    "id"
-  ]
-}
-```
-
-### Customer
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "email": {
-      "type": "string"
-    }
-  }
-}
-```
+### Pet
+- Type: object
+- Properties:
+  - **id**: integer *(required)*
+  - **name**: string *(required)*
+  - **friend**: `Pet`
 
 ## User Stories
 
-As a customer, I want to view my past orders.
-As a customer, I want to download an invoice for an order.
+As a user, I want to list all pets so that I can see what's available.
+As a user, I want to view a pet's friend relationship.
 
 
 ## Warnings
 
-- Unresolvable $ref: $.paths./orders/{orderId}/invoice.get.responses.200.content.application/json.schema -> #/components/schemas/Invoice
-- Unresolvable $ref: $.components.schemas.Order.properties.shippingLabel -> #/components/schemas/ShippingLabel
+- none
 
 ## Broken $ref Summary
 
-- Total broken $ref occurrences: 2
-- Affected endpoints: 2
-  - GET /orders
-  - GET /orders/{orderId}/invoice
+- Total broken $ref occurrences: 0
+- Affected endpoints: 0

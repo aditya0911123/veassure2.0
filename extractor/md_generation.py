@@ -102,35 +102,20 @@ def _render_property(name: str, value: Any, required: bool, lines: list[str], in
 
     schema = value if isinstance(value, dict) else {}
     lines.append(f"{indent}- **{name}**: {_type_summary(schema)}{req_suffix}")
-    _render_schema_details(schema, lines, indent + "  ")
+    _render_schema_body(schema, lines, indent + "  ", show_type=False)
 
 
-def _render_schema_details(schema: dict[str, Any], lines: list[str], indent: str) -> None:
-    """Detail sub-bullets for an inline schema dict: description,
-    constraints, enum, default, example. Does not render type/name - the
-    caller already put that on the parent bullet line."""
-    if schema.get("description"):
-        lines.append(f"{indent}- Description: {schema['description']}")
+def _render_schema_body(schema: Any, lines: list[str], indent: str = "", show_type: bool = True) -> None:
+    """Full rendering of a schema slot - used for a top-level named
+    schema, recursively for nested inline schemas (allOf/oneOf/anyOf
+    members, array items), and for a property's own detail lines (with
+    show_type=False, since the property's header bullet already carries a
+    compact type summary - see _render_property).
 
-    constraints = _constraints_of(schema)
-    if constraints:
-        lines.append(f"{indent}- Constraints: {', '.join(constraints)}")
-
-    if "enum" in schema:
-        lines.append(f"{indent}- Enum: {', '.join(json.dumps(v) for v in schema['enum'])}")
-
-    if "default" in schema:
-        lines.append(f"{indent}- Default: {json.dumps(schema['default'])}")
-
-    example = schema.get("example", schema.get("examples"))
-    if example is not None:
-        lines.append(f"{indent}- Example: {json.dumps(example)}")
-
-
-def _render_schema_body(schema: Any, lines: list[str], indent: str = "") -> None:
-    """Full rendering of a schema slot - used both for a top-level named
-    schema and recursively for nested inline schemas (allOf members,
-    array items)."""
+    Composition (allOf/oneOf/anyOf) is rendered *in addition to* the
+    schema's own type/constraints/properties/etc., not instead of them -
+    a schema can legally combine allOf with its own sibling "properties"
+    (and even a broken $ref among them), and all of it must show up here."""
     ref_label = _ref_label(schema)
     if ref_label:
         lines.append(f"{indent}- {ref_label}")
@@ -140,24 +125,30 @@ def _render_schema_body(schema: Any, lines: list[str], indent: str = "") -> None
         lines.append(f"{indent}- (unrecognized schema value: {json.dumps(schema)})")
         return
 
+    has_composition = False
     for keyword in ("allOf", "oneOf", "anyOf"):
         members = schema.get(keyword)
         if members is None:
             continue
+        has_composition = True
+        relation = "extends" if keyword == "allOf" else "option"
         lines.append(f"{indent}- Composition: {keyword}")
         for member in members:
             member_label = _ref_label(member)
             if member_label:
-                lines.append(f"{indent}  - extends {member_label}")
+                lines.append(f"{indent}  - {relation} {member_label}")
             else:
-                lines.append(f"{indent}  - inline schema:")
+                lines.append(f"{indent}  - inline {relation}:")
                 _render_schema_body(member, lines, indent + "    ")
-        return
 
     if schema.get("description"):
         lines.append(f"{indent}- Description: {schema['description']}")
 
-    lines.append(f"{indent}- Type: {_type_summary(schema)}")
+    # Skip the synthetic "composed schema" type label when composition
+    # was already rendered above and there's no *additional* explicit
+    # "type" alongside it - avoids a redundant/uninformative line.
+    if show_type and (not has_composition or schema.get("type")):
+        lines.append(f"{indent}- Type: {_type_summary(schema)}")
 
     constraints = _constraints_of(schema)
     if constraints:
@@ -185,6 +176,157 @@ def _render_schema_body(schema: Any, lines: list[str], indent: str = "") -> None
         if isinstance(items, dict) and not items.get("unresolvable"):
             lines.append(f"{indent}- Items:")
             _render_schema_body(items, lines, indent + "  ")
+
+
+def _render_contact(contact: dict[str, Any] | None, lines: list[str]) -> None:
+    if not contact:
+        lines.append("- Contact: (none)")
+        return
+    name = contact.get("name") or "(unnamed)"
+    label = f"{name} ({contact['email']})" if contact.get("email") else name
+    if contact.get("url"):
+        label += f" — {contact['url']}"
+    lines.append(f"- Contact: {label}")
+
+
+def _render_license(license_obj: dict[str, Any] | None, lines: list[str]) -> None:
+    if not license_obj:
+        lines.append("- License: (none)")
+        return
+    name = license_obj.get("name") or "(unnamed)"
+    url = license_obj.get("url") or license_obj.get("identifier")
+    lines.append(f"- License: {name} — {url}" if url else f"- License: {name}")
+
+
+def _render_servers(servers: list[dict[str, Any]] | None, lines: list[str]) -> None:
+    lines.append("- Servers:")
+    if not servers:
+        lines.append("  - (none)")
+        return
+    for server in servers:
+        url = server.get("url", "(no url)")
+        description = server.get("description")
+        lines.append(f"  - {url} — {description}" if description else f"  - {url}")
+
+
+def _render_tags(tags: list[dict[str, Any]] | None, lines: list[str]) -> None:
+    lines.append("- Tags:")
+    if not tags:
+        lines.append("  - (none)")
+        return
+    for tag in tags:
+        name = tag.get("name", "(unnamed)")
+        description = tag.get("description")
+        lines.append(f"  - {name} — {description}" if description else f"  - {name}")
+
+
+def _render_security_requirements(
+    requirements: list[dict[str, Any]] | None, lines: list[str], indent: str
+) -> None:
+    if not requirements:
+        lines.append(f"{indent}- (none)")
+        return
+    for requirement in requirements:
+        if not requirement:
+            continue
+        for scheme_name, scopes in requirement.items():
+            if scopes:
+                lines.append(f"{indent}- {scheme_name} (scopes: {', '.join(scopes)})")
+            else:
+                lines.append(f"{indent}- {scheme_name}")
+
+
+def _render_security_schemes(schemes: dict[str, Any] | None, lines: list[str]) -> None:
+    lines.append("- Schemes:")
+    if not schemes:
+        lines.append("  - (none)")
+        return
+    for name, scheme in schemes.items():
+        lines.append(f"  - **{name}**")
+        scheme_type = scheme.get("type")
+        lines.append(f"    - Type: {scheme_type}")
+        if scheme_type == "apiKey":
+            lines.append(f"    - Location: {scheme.get('in')}")
+            lines.append(f"    - Parameter name: {scheme.get('name')}")
+        elif scheme_type == "http":
+            lines.append(f"    - Scheme: {scheme.get('scheme')}")
+            if scheme.get("bearerFormat"):
+                lines.append(f"    - Bearer format: {scheme['bearerFormat']}")
+        elif scheme_type == "oauth2":
+            for flow_name, flow in (scheme.get("flows") or {}).items():
+                scopes = (flow or {}).get("scopes") or {}
+                scope_label = ", ".join(scopes.keys()) if scopes else "none"
+                lines.append(f"    - Flow: {flow_name} (scopes: {scope_label})")
+        elif scheme_type == "openIdConnect":
+            lines.append(f"    - OpenID Connect URL: {scheme.get('openIdConnectUrl')}")
+        if scheme.get("description"):
+            lines.append(f"    - Description: {scheme['description']}")
+
+
+def _render_endpoint_security(security: Any, lines: list[str]) -> None:
+    if security == "inherits_global":
+        lines.append("- Security: Inherits global security")
+        return
+    if security == []:
+        lines.append("- Security: No authentication required")
+        return
+    lines.append("- Security:")
+    _render_security_requirements(security, lines, "  ")
+
+
+def _render_example_entry(name: str | None, value: Any, lines: list[str], indent: str) -> None:
+    label = f"**{name}**: " if name else ""
+    ref_label = _ref_label(value)
+    if ref_label:
+        lines.append(f"{indent}- {label}{ref_label}")
+        return
+    if isinstance(value, dict) and ("summary" in value or "value" in value):
+        summary = value.get("summary")
+        example_value = json.dumps(value.get("value"))
+        lines.append(
+            f"{indent}- {label}{summary} — {example_value}" if summary else f"{indent}- {label}{example_value}"
+        )
+        return
+    lines.append(f"{indent}- {label}{json.dumps(value)}")
+
+
+def _collect_examples(
+    request_body: dict[str, Any] | None, responses: dict[str, Any] | None
+) -> list[tuple[str, dict[str, Any]]]:
+    found: list[tuple[str, dict[str, Any]]] = []
+
+    if isinstance(request_body, dict):
+        for media_type, media_obj in (request_body.get("content") or {}).items():
+            if isinstance(media_obj, dict) and ("example" in media_obj or media_obj.get("examples")):
+                found.append((f"Request body ({media_type})", media_obj))
+
+    if isinstance(responses, dict):
+        for code, response in responses.items():
+            if not isinstance(response, dict):
+                continue
+            for media_type, media_obj in (response.get("content") or {}).items():
+                if isinstance(media_obj, dict) and ("example" in media_obj or media_obj.get("examples")):
+                    found.append((f"Response {code} ({media_type})", media_obj))
+
+    return found
+
+
+def _render_endpoint_examples(
+    request_body: dict[str, Any] | None, responses: dict[str, Any] | None, lines: list[str]
+) -> None:
+    locations = _collect_examples(request_body, responses)
+    if not locations:
+        return
+
+    lines.append("- Examples:")
+    for label, media_obj in locations:
+        lines.append(f"  - {label}:")
+        if "example" in media_obj:
+            _render_example_entry(None, media_obj["example"], lines, "    ")
+        examples = media_obj.get("examples")
+        if examples:
+            for example_name, example_value in examples.items():
+                _render_example_entry(example_name, example_value, lines, "    ")
 
 
 def _render_parameters(parameters: list[dict[str, Any]] | None, lines: list[str], indent: str) -> None:
@@ -274,21 +416,16 @@ def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any]) -> str:
     lines.append(f"- Title: {json.dumps(meta.get('title'))}")
     lines.append(f"- Version: {json.dumps(meta.get('version'))}")
     lines.append(f"- Description: {json.dumps(meta.get('description'))}")
-    lines.append(f"- Contact: {json.dumps(meta.get('contact'))}")
-    lines.append(f"- License: {json.dumps(meta.get('license'))}")
-    lines.append(f"- Servers: {json.dumps(meta.get('servers'))}")
-    lines.append(f"- Tags: {json.dumps(meta.get('tags'))}")
+    _render_contact(meta.get("contact"), lines)
+    _render_license(meta.get("license"), lines)
+    _render_servers(meta.get("servers"), lines)
+    _render_tags(meta.get("tags"), lines)
     lines.append("")
 
     lines += _section("Security")
-    lines.append(f"- Global requirements: {json.dumps(data['security'].get('global_requirements'))}")
-    lines.append("- Schemes:")
-    schemes = data["security"].get("schemes", {})
-    if schemes:
-        for name, scheme in schemes.items():
-            lines.append(f"  - {name}: {json.dumps(scheme)}")
-    else:
-        lines.append("  - none")
+    lines.append("- Global requirements:")
+    _render_security_requirements(data["security"].get("global_requirements"), lines, "  ")
+    _render_security_schemes(data["security"].get("schemes"), lines)
     lines.append("")
 
     lines += _section("Endpoints")
@@ -298,7 +435,7 @@ def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any]) -> str:
         lines.append(f"- summary: {json.dumps(entry.get('summary'))}")
         lines.append(f"- description: {json.dumps(entry.get('description'))}")
         lines.append(f"- tags: {json.dumps(entry.get('tags'))}")
-        lines.append(f"- security: {json.dumps(entry.get('security'))}")
+        _render_endpoint_security(entry.get("security"), lines)
 
         lines.append("- Parameters:")
         _render_parameters(entry.get("parameters"), lines, "  ")
@@ -308,6 +445,8 @@ def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any]) -> str:
 
         lines.append("- Responses:")
         _render_responses(entry.get("responses"), lines, "  ")
+
+        _render_endpoint_examples(entry.get("request_body"), entry.get("responses"), lines)
 
         lines.append("")
 

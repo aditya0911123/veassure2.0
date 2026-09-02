@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "title": "Order API",
+    "title": "Sample API",
     "version": "1.0.0",
-    "description": "Tests broken/unresolvable $refs at both endpoint level and nested inside a schema.",
+    "description": null,
     "contact": null,
     "license": null,
     "servers": [],
@@ -14,56 +14,21 @@
   },
   "endpoints": [
     {
-      "path": "/orders",
+      "path": "/pets",
       "method": "GET",
-      "operationId": "listOrders",
+      "operationId": "listPets",
       "summary": null,
       "description": null,
       "tags": [],
-      "security": null,
+      "security": "inherits_global",
       "parameters": [],
       "request_body": null,
       "responses": {
         "200": {
-          "description": "All orders",
+          "description": "OK",
           "content": {
             "application/json": {
-              "schema": {
-                "type": "array",
-                "items": "Order"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "path": "/orders/{orderId}/invoice",
-      "method": "GET",
-      "operationId": "getOrderInvoice",
-      "summary": null,
-      "description": null,
-      "tags": [],
-      "security": null,
-      "parameters": [
-        {
-          "name": "orderId",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "request_body": null,
-      "responses": {
-        "200": {
-          "description": "Invoice document",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Invoice"
-              }
+              "schema": "Pet"
             }
           }
         }
@@ -71,36 +36,23 @@
     }
   ],
   "schemas": {
-    "Order": {
+    "Pet": {
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "integer"
         },
-        "customer": "Customer",
-        "shippingLabel": {
-          "$ref": "#/components/schemas/ShippingLabel"
-        }
-      },
-      "required": [
-        "id"
-      ]
-    },
-    "Customer": {
-      "type": "object",
-      "properties": {
         "name": {
           "type": "string"
         },
-        "email": {
-          "type": "string"
-        }
-      }
+        "friend": "Pet"
+      },
+      "required": [
+        "id",
+        "name"
+      ]
     }
   },
-  "user_stories": "As a customer, I want to view my past orders.\nAs a customer, I want to download an invoice for an order.\n",
-  "warnings": [
-    "Unresolvable $ref: $.paths./orders/{orderId}/invoice.get.responses.200.content.application/json.schema -> #/components/schemas/Invoice",
-    "Unresolvable $ref: $.components.schemas.Order.properties.shippingLabel -> #/components/schemas/ShippingLabel"
-  ]
+  "user_stories": "As a user, I want to list all pets so that I can see what's available.\nAs a user, I want to view a pet's friend relationship.\n",
+  "warnings": []
 }

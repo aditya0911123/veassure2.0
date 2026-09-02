@@ -31,7 +31,7 @@
       "tags": [
         "books"
       ],
-      "security": null,
+      "security": "inherits_global",
       "parameters": [],
       "request_body": null,
       "responses": {
@@ -57,7 +57,7 @@
       "tags": [
         "books"
       ],
-      "security": null,
+      "security": "inherits_global",
       "parameters": [],
       "request_body": {
         "required": true,
@@ -87,7 +87,7 @@
       "tags": [
         "books"
       ],
-      "security": null,
+      "security": "inherits_global",
       "parameters": [
         {
           "name": "bookId",
@@ -122,7 +122,7 @@
       "tags": [
         "books"
       ],
-      "security": null,
+      "security": "inherits_global",
       "parameters": [
         {
           "name": "bookId",

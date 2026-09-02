@@ -5,16 +5,19 @@
 - Title: "Bookstore API"
 - Version: "1.0.0"
 - Description: "A small, plain CRUD API with no composition, no broken refs, no recursion."
-- Contact: null
-- License: null
-- Servers: [{"url": "https://api.example.com/v1"}]
-- Tags: [{"name": "books", "description": "Book catalog operations"}]
+- Contact: (none)
+- License: (none)
+- Servers:
+  - https://api.example.com/v1
+- Tags:
+  - books — Book catalog operations
 
 ## Security
 
-- Global requirements: []
+- Global requirements:
+  - (none)
 - Schemes:
-  - none
+  - (none)
 
 ## Endpoints
 
@@ -23,7 +26,7 @@
 - summary: "List all books"
 - description: null
 - tags: ["books"]
-- security: null
+- Security: Inherits global security
 - Parameters:
   - (none)
 - Request body:
@@ -37,7 +40,7 @@
 - summary: "Create a new book"
 - description: null
 - tags: ["books"]
-- security: null
+- Security: Inherits global security
 - Parameters:
   - (none)
 - Request body:
@@ -52,7 +55,7 @@
 - summary: "Get a single book"
 - description: null
 - tags: ["books"]
-- security: null
+- Security: Inherits global security
 - Parameters:
   - **bookId** (path, required): string
 - Request body:
@@ -67,7 +70,7 @@
 - summary: "Delete a book"
 - description: null
 - tags: ["books"]
-- security: null
+- Security: Inherits global security
 - Parameters:
   - **bookId** (path, required): string
 - Request body:

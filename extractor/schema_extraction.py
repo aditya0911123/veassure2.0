@@ -30,13 +30,25 @@ def extract_schemas(
 
     schemas: dict[str, Any] = {}
     for name, definition in raw_schemas.items():
-        schemas[name] = build_clean_view(
+        result = build_clean_view(
             definition,
             resolved_schemas.get(name),
             raw_spec,
             f"components.schemas.{name}",
             warnings,
         )
+        # A schema whose entire body is nothing but a broken $ref (e.g.
+        # "GhostSchema": {"$ref": "#/components/schemas/DoesNotExist"})
+        # comes back from build_clean_view in the inline usage-site marker
+        # shape ({"$ref": ..., "unresolvable": true}). At the top level of
+        # a named schema entry, normalize that to the same placeholder
+        # shape used for a name that's referenced but never defined at all
+        # ({"unresolvable": true, "ref": ...}) - one broken-schema shape,
+        # not two, at this level. Nested usage sites (a property whose
+        # value is a broken ref) keep the original inline marker shape.
+        if isinstance(result, dict) and result.get("unresolvable") and "$ref" in result:
+            result = {"unresolvable": True, "ref": result["$ref"]}
+        schemas[name] = result
 
     for warning in warnings:
         if not warning.startswith("Unresolvable $ref:"):

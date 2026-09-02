@@ -20,7 +20,7 @@
       "summary": null,
       "description": null,
       "tags": [],
-      "security": null,
+      "security": "inherits_global",
       "parameters": [
         {
           "name": "index",
