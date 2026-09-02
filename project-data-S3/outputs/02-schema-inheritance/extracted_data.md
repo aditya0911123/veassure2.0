@@ -24,9 +24,13 @@
 - description: null
 - tags: []
 - security: null
-- parameters: []
-- request_body: null
-- responses: {"200": {"description": "All vehicles", "content": {"application/json": {"schema": {"type": "array", "items": "Vehicle"}}}}}
+- Parameters:
+  - (none)
+- Request body:
+  - (none)
+- Responses:
+  - **200**: All vehicles
+    - application/json: array of `Vehicle`
 
 ### GET /vehicles/cars
 - operationId: "listCars"
@@ -34,9 +38,13 @@
 - description: null
 - tags: []
 - security: null
-- parameters: []
-- request_body: null
-- responses: {"200": {"description": "All cars", "content": {"application/json": {"schema": {"type": "array", "items": "Car"}}}}}
+- Parameters:
+  - (none)
+- Request body:
+  - (none)
+- Responses:
+  - **200**: All cars
+    - application/json: array of `Car`
 
 ### GET /vehicles/sports-cars
 - operationId: "listSportsCars"
@@ -44,83 +52,41 @@
 - description: null
 - tags: []
 - security: null
-- parameters: []
-- request_body: null
-- responses: {"200": {"description": "All sports cars", "content": {"application/json": {"schema": {"type": "array", "items": "SportsCar"}}}}}
+- Parameters:
+  - (none)
+- Request body:
+  - (none)
+- Responses:
+  - **200**: All sports cars
+    - application/json: array of `SportsCar`
 
 ## Schemas
 
 ### Vehicle
-```json
-{
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "string"
-    },
-    "make": {
-      "type": "string"
-    },
-    "model": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "id",
-    "make",
-    "model"
-  ]
-}
-```
+- Type: object
+- Properties:
+  - **id**: string *(required)*
+  - **make**: string *(required)*
+  - **model**: string *(required)*
 
 ### Car
-```json
-{
-  "allOf": [
-    "Vehicle",
-    {
-      "type": "object",
-      "properties": {
-        "doors": {
-          "type": "integer"
-        },
-        "fuelType": {
-          "type": "string",
-          "enum": [
-            "petrol",
-            "diesel",
-            "electric",
-            "hybrid"
-          ]
-        }
-      }
-    }
-  ]
-}
-```
+- Composition: allOf
+  - extends `Vehicle`
+  - inline schema:
+    - Type: object
+    - Properties:
+      - **doors**: integer
+      - **fuelType**: string
+        - Enum: "petrol", "diesel", "electric", "hybrid"
 
 ### SportsCar
-```json
-{
-  "allOf": [
-    "Car",
-    {
-      "type": "object",
-      "properties": {
-        "topSpeedKph": {
-          "type": "number"
-        },
-        "zeroToHundredSeconds": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "topSpeedKph"
-      ]
-    }
-  ]
-}
-```
+- Composition: allOf
+  - extends `Car`
+  - inline schema:
+    - Type: object
+    - Properties:
+      - **topSpeedKph**: number *(required)*
+      - **zeroToHundredSeconds**: number
 
 ## User Stories
 

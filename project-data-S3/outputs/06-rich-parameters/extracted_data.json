@@ -1,0 +1,146 @@
+{
+  "metadata": {
+    "title": "Search API",
+    "version": "1.0.0",
+    "description": "Tests path-level shared parameters merged with operation-level parameters across all 'in' locations, plus multiple response codes.",
+    "contact": null,
+    "license": null,
+    "servers": [],
+    "tags": []
+  },
+  "security": {
+    "schemes": {},
+    "global_requirements": []
+  },
+  "endpoints": [
+    {
+      "path": "/search/{index}",
+      "method": "GET",
+      "operationId": "search",
+      "summary": null,
+      "description": null,
+      "tags": [],
+      "security": null,
+      "parameters": [
+        {
+          "name": "index",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Shared across every method on this path"
+        },
+        {
+          "name": "X-Request-Id",
+          "in": "header",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "description": "Also shared - a path-level header parameter"
+        },
+        {
+          "name": "q",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        },
+        {
+          "name": "session",
+          "in": "cookie",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "Search results",
+          "content": {
+            "application/json": {
+              "schema": "SearchResults"
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid query",
+          "content": {
+            "application/json": {
+              "schema": "Error"
+            }
+          }
+        },
+        "404": {
+          "description": "Index not found",
+          "content": {
+            "application/json": {
+              "schema": "Error"
+            }
+          }
+        },
+        "500": {
+          "description": "Internal error",
+          "content": {
+            "application/json": {
+              "schema": "Error"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "schemas": {
+    "SearchResults": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "total",
+        "items"
+      ]
+    },
+    "Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ]
+    }
+  },
+  "user_stories": null,
+  "warnings": []
+}

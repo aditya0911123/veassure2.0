@@ -1,0 +1,190 @@
+{
+  "metadata": {
+    "title": "Bookstore API",
+    "version": "1.0.0",
+    "description": "A small, plain CRUD API with no composition, no broken refs, no recursion.",
+    "contact": null,
+    "license": null,
+    "servers": [
+      {
+        "url": "https://api.example.com/v1"
+      }
+    ],
+    "tags": [
+      {
+        "name": "books",
+        "description": "Book catalog operations"
+      }
+    ]
+  },
+  "security": {
+    "schemes": {},
+    "global_requirements": []
+  },
+  "endpoints": [
+    {
+      "path": "/books",
+      "method": "GET",
+      "operationId": "listBooks",
+      "summary": "List all books",
+      "description": null,
+      "tags": [
+        "books"
+      ],
+      "security": null,
+      "parameters": [],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "A list of books",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": "Book"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/books",
+      "method": "POST",
+      "operationId": "createBook",
+      "summary": "Create a new book",
+      "description": null,
+      "tags": [
+        "books"
+      ],
+      "security": null,
+      "parameters": [],
+      "request_body": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": "BookInput"
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Book created",
+          "content": {
+            "application/json": {
+              "schema": "Book"
+            }
+          }
+        }
+      }
+    },
+    {
+      "path": "/books/{bookId}",
+      "method": "GET",
+      "operationId": "getBook",
+      "summary": "Get a single book",
+      "description": null,
+      "tags": [
+        "books"
+      ],
+      "security": null,
+      "parameters": [
+        {
+          "name": "bookId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_body": null,
+      "responses": {
+        "200": {
+          "description": "The book",
+          "content": {
+            "application/json": {
+              "schema": "Book"
+            }
+          }
+        },
+        "404": {
+          "description": "Book not found"
+        }
+      }
+    },
+    {
+      "path": "/books/{bookId}",
+      "method": "DELETE",
+      "operationId": "deleteBook",
+      "summary": "Delete a book",
+      "description": null,
+      "tags": [
+        "books"
+      ],
+      "security": null,
+      "parameters": [
+        {
+          "name": "bookId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "request_body": null,
+      "responses": {
+        "204": {
+          "description": "Book deleted"
+        }
+      }
+    }
+  ],
+  "schemas": {
+    "Book": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "publishedYear": {
+          "type": "integer",
+          "minimum": 1450
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "author"
+      ]
+    },
+    "BookInput": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "publishedYear": {
+          "type": "integer",
+          "minimum": 1450
+        }
+      },
+      "required": [
+        "title",
+        "author"
+      ]
+    }
+  },
+  "user_stories": "As a shopper, I want to see a list of all books so that I can browse the catalog.\nAs a shopper, I want to view a single book's details before buying it.\nAs an admin, I want to add new books to the catalog.\nAs an admin, I want to remove books that are no longer sold.\n",
+  "warnings": []
+}

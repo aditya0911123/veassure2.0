@@ -24,9 +24,13 @@
 - description: null
 - tags: []
 - security: null
-- parameters: []
-- request_body: null
-- responses: {"200": {"description": "All orders", "content": {"application/json": {"schema": {"type": "array", "items": "Order"}}}}}
+- Parameters:
+  - (none)
+- Request body:
+  - (none)
+- Responses:
+  - **200**: All orders
+    - application/json: array of `Order`
 
 ### GET /orders/{orderId}/invoice
 - operationId: "getOrderInvoice"
@@ -34,46 +38,28 @@
 - description: null
 - tags: []
 - security: null
-- parameters: [{"name": "orderId", "in": "path", "required": true, "schema": {"type": "string"}}]
-- request_body: null
-- responses: {"200": {"description": "Invoice document", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Invoice", "unresolvable": true}}}}}
+- Parameters:
+  - **orderId** (path, required): string
+- Request body:
+  - (none)
+- Responses:
+  - **200**: Invoice document
+    - application/json: ⚠️ unresolvable $ref → #/components/schemas/Invoice
 
 ## Schemas
 
 ### Order
-```json
-{
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "string"
-    },
-    "customer": "Customer",
-    "shippingLabel": {
-      "$ref": "#/components/schemas/ShippingLabel",
-      "unresolvable": true
-    }
-  },
-  "required": [
-    "id"
-  ]
-}
-```
+- Type: object
+- Properties:
+  - **id**: string *(required)*
+  - **customer**: `Customer`
+  - **shippingLabel**: ⚠️ unresolvable $ref → #/components/schemas/ShippingLabel
 
 ### Customer
-```json
-{
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string"
-    },
-    "email": {
-      "type": "string"
-    }
-  }
-}
-```
+- Type: object
+- Properties:
+  - **name**: string
+  - **email**: string
 
 ## User Stories
 

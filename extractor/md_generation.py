@@ -3,6 +3,17 @@ extracted_data.json's six sections, plus a broken-$ref summary appended at
 the very end with a count of affected endpoints (an endpoint counts as
 affected if it directly holds a broken ref, or transitively uses a named
 schema whose own body contains one).
+
+Schemas and endpoints are rendered as readable markdown (headings/bullets),
+never as raw JSON dumps. A "schema slot" - any position that could hold a
+schema reference (a property value, array items, an allOf/oneOf/anyOf
+member, a parameter's schema, a response/request body schema) - is one of
+three things coming out of build_clean_view, and every renderer below
+switches on exactly these three shapes:
+  - a bare string  -> a resolved reference; rendered as `Name`
+  - {"$ref": ..., "unresolvable": true} -> a broken reference; rendered as
+    the inline warning glyph
+  - a plain dict with no "$ref" -> an inline schema, rendered in full
 """
 
 from __future__ import annotations
@@ -16,6 +27,203 @@ from .ref_resolution import (
     direct_broken_refs,
     direct_schema_names_used,
 )
+
+_CONSTRAINT_KEYS = (
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "minLength",
+    "maxLength",
+    "pattern",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "minProperties",
+    "maxProperties",
+    "multipleOf",
+)
+
+
+def _ref_label(value: Any) -> str | None:
+    """If value is a schema-reference slot (resolved name string, or a
+    broken-ref marker), return its inline label. Otherwise None, meaning
+    the caller should render it as an inline schema instead."""
+    if isinstance(value, str):
+        return f"`{value}`"
+    if isinstance(value, dict) and value.get("unresolvable"):
+        return f"⚠️ unresolvable $ref → {value.get('$ref')}"
+    return None
+
+
+def _constraints_of(schema: dict[str, Any]) -> list[str]:
+    return [f"{k}={json.dumps(schema[k])}" for k in _CONSTRAINT_KEYS if k in schema]
+
+
+def _type_summary(schema: Any) -> str:
+    """Short type description for an inline schema dict: 'string',
+    'array of `Comment`', 'object', 'composed schema', etc."""
+    ref_label = _ref_label(schema)
+    if ref_label:
+        return ref_label
+    if not isinstance(schema, dict):
+        return "unspecified"
+
+    schema_type = schema.get("type")
+    if schema_type == "array":
+        items = schema.get("items")
+        items_label = _ref_label(items)
+        if items_label:
+            return f"array of {items_label}"
+        if isinstance(items, dict):
+            return f"array of {_type_summary(items)}"
+        return "array"
+    if schema_type:
+        fmt = schema.get("format")
+        return f"{schema_type} ({fmt})" if fmt else schema_type
+    if any(k in schema for k in ("allOf", "oneOf", "anyOf")):
+        return "composed schema"
+    return "object"
+
+
+def _render_property(name: str, value: Any, required: bool, lines: list[str], indent: str) -> None:
+    req_suffix = " *(required)*" if required else ""
+
+    ref_label = _ref_label(value)
+    if ref_label:
+        lines.append(f"{indent}- **{name}**: {ref_label}{req_suffix}")
+        return
+
+    schema = value if isinstance(value, dict) else {}
+    lines.append(f"{indent}- **{name}**: {_type_summary(schema)}{req_suffix}")
+    _render_schema_details(schema, lines, indent + "  ")
+
+
+def _render_schema_details(schema: dict[str, Any], lines: list[str], indent: str) -> None:
+    """Detail sub-bullets for an inline schema dict: description,
+    constraints, enum, default, example. Does not render type/name - the
+    caller already put that on the parent bullet line."""
+    if schema.get("description"):
+        lines.append(f"{indent}- Description: {schema['description']}")
+
+    constraints = _constraints_of(schema)
+    if constraints:
+        lines.append(f"{indent}- Constraints: {', '.join(constraints)}")
+
+    if "enum" in schema:
+        lines.append(f"{indent}- Enum: {', '.join(json.dumps(v) for v in schema['enum'])}")
+
+    if "default" in schema:
+        lines.append(f"{indent}- Default: {json.dumps(schema['default'])}")
+
+    example = schema.get("example", schema.get("examples"))
+    if example is not None:
+        lines.append(f"{indent}- Example: {json.dumps(example)}")
+
+
+def _render_schema_body(schema: Any, lines: list[str], indent: str = "") -> None:
+    """Full rendering of a schema slot - used both for a top-level named
+    schema and recursively for nested inline schemas (allOf members,
+    array items)."""
+    ref_label = _ref_label(schema)
+    if ref_label:
+        lines.append(f"{indent}- {ref_label}")
+        return
+
+    if not isinstance(schema, dict):
+        lines.append(f"{indent}- (unrecognized schema value: {json.dumps(schema)})")
+        return
+
+    for keyword in ("allOf", "oneOf", "anyOf"):
+        members = schema.get(keyword)
+        if members is None:
+            continue
+        lines.append(f"{indent}- Composition: {keyword}")
+        for member in members:
+            member_label = _ref_label(member)
+            if member_label:
+                lines.append(f"{indent}  - extends {member_label}")
+            else:
+                lines.append(f"{indent}  - inline schema:")
+                _render_schema_body(member, lines, indent + "    ")
+        return
+
+    if schema.get("description"):
+        lines.append(f"{indent}- Description: {schema['description']}")
+
+    lines.append(f"{indent}- Type: {_type_summary(schema)}")
+
+    constraints = _constraints_of(schema)
+    if constraints:
+        lines.append(f"{indent}- Constraints: {', '.join(constraints)}")
+
+    if "enum" in schema:
+        lines.append(f"{indent}- Enum: {', '.join(json.dumps(v) for v in schema['enum'])}")
+
+    if "default" in schema:
+        lines.append(f"{indent}- Default: {json.dumps(schema['default'])}")
+
+    example = schema.get("example", schema.get("examples"))
+    if example is not None:
+        lines.append(f"{indent}- Example: {json.dumps(example)}")
+
+    properties = schema.get("properties")
+    if properties:
+        required = set(schema.get("required", []))
+        lines.append(f"{indent}- Properties:")
+        for prop_name, prop_value in properties.items():
+            _render_property(prop_name, prop_value, prop_name in required, lines, indent + "  ")
+
+    if schema.get("type") == "array":
+        items = schema.get("items")
+        if isinstance(items, dict) and not items.get("unresolvable"):
+            lines.append(f"{indent}- Items:")
+            _render_schema_body(items, lines, indent + "  ")
+
+
+def _render_parameters(parameters: list[dict[str, Any]] | None, lines: list[str], indent: str) -> None:
+    if not parameters:
+        lines.append(f"{indent}- (none)")
+        return
+
+    for param in parameters:
+        name = param.get("name")
+        location = param.get("in")
+        req_label = "required" if param.get("required") else "optional"
+        type_desc = _type_summary(param.get("schema"))
+        lines.append(f"{indent}- **{name}** ({location}, {req_label}): {type_desc}")
+        if param.get("description"):
+            lines.append(f"{indent}  - Description: {param['description']}")
+
+
+def _render_content_schemas(content: dict[str, Any] | None, lines: list[str], indent: str) -> None:
+    if not content:
+        return
+    for media_type, media_obj in content.items():
+        schema = media_obj.get("schema") if isinstance(media_obj, dict) else None
+        lines.append(f"{indent}- {media_type}: {_type_summary(schema)}")
+
+
+def _render_request_body(request_body: dict[str, Any] | None, lines: list[str], indent: str) -> None:
+    if not request_body:
+        lines.append(f"{indent}- (none)")
+        return
+
+    req_label = "required" if request_body.get("required") else "optional"
+    lines.append(f"{indent}- {req_label}")
+    _render_content_schemas(request_body.get("content"), lines, indent + "  ")
+
+
+def _render_responses(responses: dict[str, Any] | None, lines: list[str], indent: str) -> None:
+    if not responses:
+        lines.append(f"{indent}- (none)")
+        return
+
+    for code, response in responses.items():
+        description = response.get("description") if isinstance(response, dict) else None
+        lines.append(f"{indent}- **{code}**: {description or '(no description)'}")
+        if isinstance(response, dict):
+            _render_content_schemas(response.get("content"), lines, indent + "  ")
 
 
 def _compute_affected_endpoints(raw_spec: dict[str, Any], broken_refs: list[str]) -> list[str]:
@@ -85,17 +293,22 @@ def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any]) -> str:
         lines.append(f"- description: {json.dumps(entry.get('description'))}")
         lines.append(f"- tags: {json.dumps(entry.get('tags'))}")
         lines.append(f"- security: {json.dumps(entry.get('security'))}")
-        lines.append(f"- parameters: {json.dumps(entry.get('parameters'))}")
-        lines.append(f"- request_body: {json.dumps(entry.get('request_body'))}")
-        lines.append(f"- responses: {json.dumps(entry.get('responses'))}")
+
+        lines.append("- Parameters:")
+        _render_parameters(entry.get("parameters"), lines, "  ")
+
+        lines.append("- Request body:")
+        _render_request_body(entry.get("request_body"), lines, "  ")
+
+        lines.append("- Responses:")
+        _render_responses(entry.get("responses"), lines, "  ")
+
         lines.append("")
 
     lines += _section("Schemas")
     for name, schema in data["schemas"].items():
         lines.append(f"### {name}")
-        lines.append("```json")
-        lines.append(json.dumps(schema, indent=2))
-        lines.append("```")
+        _render_schema_body(schema, lines)
         lines.append("")
 
     lines += _section("User Stories")
