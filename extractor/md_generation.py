@@ -48,11 +48,17 @@ _CONSTRAINT_KEYS = (
 def _ref_label(value: Any) -> str | None:
     """If value is a schema-reference slot (resolved name string, or a
     broken-ref marker), return its inline label. Otherwise None, meaning
-    the caller should render it as an inline schema instead."""
+    the caller should render it as an inline schema instead.
+
+    Two broken-ref marker shapes exist: build_clean_view's inline
+    usage-site marker uses key "$ref", while extract_schemas' top-level
+    placeholder for a referenced-but-never-defined schema uses "ref" -
+    both are checked here."""
     if isinstance(value, str):
         return f"`{value}`"
     if isinstance(value, dict) and value.get("unresolvable"):
-        return f"⚠️ unresolvable $ref → {value.get('$ref')}"
+        ref = value.get("$ref") or value.get("ref")
+        return f"⚠️ unresolvable $ref → {ref}"
     return None
 
 

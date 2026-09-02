@@ -61,6 +61,12 @@
   - **name**: string
   - **email**: string
 
+### Invoice
+- ⚠️ unresolvable $ref → #/components/schemas/Invoice
+
+### ShippingLabel
+- ⚠️ unresolvable $ref → #/components/schemas/ShippingLabel
+
 ## User Stories
 
 As a customer, I want to view my past orders.

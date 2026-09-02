@@ -98,6 +98,14 @@
           "type": "string"
         }
       }
+    },
+    "Invoice": {
+      "unresolvable": true,
+      "ref": "#/components/schemas/Invoice"
+    },
+    "ShippingLabel": {
+      "unresolvable": true,
+      "ref": "#/components/schemas/ShippingLabel"
     }
   },
   "user_stories": "As a customer, I want to view my past orders.\nAs a customer, I want to download an invoice for an order.\n",
