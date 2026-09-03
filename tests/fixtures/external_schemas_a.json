@@ -1,0 +1,21 @@
+{
+  "components": {
+    "schemas": {
+      "Widget": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string", "enum": ["file-a"] }
+        },
+        "required": ["id"]
+      },
+      "Gadget": {
+        "type": "object",
+        "description": "the EXTERNAL Gadget from external_schemas_a.json",
+        "properties": {
+          "externalField": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Naming conflict test",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/first": {
+      "get": {
+        "operationId": "getFirst",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "external_schemas_a.json#/components/schemas/Widget"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/second": {
+      "get": {
+        "operationId": "getSecond",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "external_schemas_b.json#/components/schemas/Widget"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/third": {
+      "get": {
+        "operationId": "getThird",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "external_schemas_a.json#/components/schemas/Widget"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "InternalCollider": {
+        "type": "object",
+        "properties": {
+          "external": {
+            "$ref": "external_schemas_a.json#/components/schemas/Gadget"
+          }
+        }
+      },
+      "Gadget": {
+        "type": "object",
+        "description": "the INTERNAL Gadget, distinct from external_schemas_a.json Gadget",
+        "properties": {
+          "internalField": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

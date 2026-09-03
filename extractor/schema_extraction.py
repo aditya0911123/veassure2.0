@@ -6,24 +6,38 @@ another named schema (composition via allOf/oneOf/anyOf, or a property
 typed as another schema) collapses to that schema's bare name instead of
 being inlined or expanded.
 
-After the resolvable schemas are extracted, the warnings list (already
-populated with every broken $ref found anywhere in the document - see
-resolve_with_prance) is scanned for any referenced name with no entry of
-its own in components.schemas, so a name used at a usage site (e.g. an
-endpoint response) but never actually defined still gets a stub entry
-here instead of only existing as an inline {"unresolvable": true} marker
-at each place it's used.
+After the internal schemas are extracted, two more passes fill out the
+section:
+
+- Every successfully-resolved EXTERNAL ref that won its target name (see
+  resolve_external_schema_placements) gets its actual fetched content
+  added under that name too - not just a bare-name reference at each
+  usage site, since otherwise nothing anywhere would define what the name
+  means.
+- The warnings list (already populated with every broken $ref found
+  anywhere in the document - see resolve_with_prance) is scanned for any
+  referenced name with no entry of its own, so a name used at a usage
+  site but never actually defined (or unreachable) still gets a stub
+  entry here instead of only existing as an inline marker at each place
+  it's used.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from .ref_resolution import build_clean_view, ref_target_name
+from .ref_resolution import build_clean_view, ref_target_name, resolve_external_ref_value
 
 
 def extract_schemas(
-    raw_spec: dict[str, Any], resolved_spec: dict[str, Any], warnings: list[str]
+    raw_spec: dict[str, Any],
+    resolved_spec: dict[str, Any],
+    warnings: list[str],
+    ref_status: dict[str, bool],
+    naming_conflicts: dict[str, str],
+    external_winners: dict[str, str],
+    base_url: str,
+    fetch_cache: dict[Any, Any],
 ) -> dict[str, Any]:
     raw_schemas = raw_spec.get("components", {}).get("schemas", {})
     resolved_schemas = resolved_spec.get("components", {}).get("schemas", {})
@@ -33,7 +47,8 @@ def extract_schemas(
         result = build_clean_view(
             definition,
             resolved_schemas.get(name),
-            raw_spec,
+            ref_status,
+            naming_conflicts,
             f"components.schemas.{name}",
             warnings,
         )
@@ -49,6 +64,16 @@ def extract_schemas(
         if isinstance(result, dict) and result.get("unresolvable") and "$ref" in result:
             result = {"unresolvable": True, "ref": result["$ref"]}
         schemas[name] = result
+
+    for name, ref in external_winners.items():
+        try:
+            schemas[name] = resolve_external_ref_value(ref, base_url, fetch_cache)
+        except Exception:
+            # Already confirmed resolvable by compute_ref_status, so this
+            # shouldn't happen - but network/file state can change, and a
+            # late failure here should degrade gracefully rather than
+            # crash extraction.
+            schemas[name] = {"unresolvable": True, "ref": ref}
 
     for warning in warnings:
         if not warning.startswith("Unresolvable $ref:"):

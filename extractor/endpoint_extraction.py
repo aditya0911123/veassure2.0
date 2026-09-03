@@ -16,7 +16,11 @@ HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "tra
 
 
 def extract_endpoints(
-    raw_spec: dict[str, Any], resolved_spec: dict[str, Any], warnings: list[str]
+    raw_spec: dict[str, Any],
+    resolved_spec: dict[str, Any],
+    warnings: list[str],
+    ref_status: dict[str, bool],
+    naming_conflicts: dict[str, str],
 ) -> list[dict[str, Any]]:
     endpoints: list[dict[str, Any]] = []
     raw_paths = raw_spec.get("paths", {})
@@ -63,19 +67,26 @@ def extract_endpoints(
                 "tags": raw_operation.get("tags", []),
                 "security": security,
                 "parameters": build_clean_view(
-                    raw_parameters, resolved_parameters, raw_spec, f"{base_path}.parameters", warnings
+                    raw_parameters,
+                    resolved_parameters,
+                    ref_status,
+                    naming_conflicts,
+                    f"{base_path}.parameters",
+                    warnings,
                 ),
                 "request_body": build_clean_view(
                     raw_operation.get("requestBody"),
                     resolved_operation.get("requestBody"),
-                    raw_spec,
+                    ref_status,
+                    naming_conflicts,
                     f"{base_path}.requestBody",
                     warnings,
                 ),
                 "responses": build_clean_view(
                     raw_operation.get("responses", {}),
                     resolved_operation.get("responses", {}),
-                    raw_spec,
+                    ref_status,
+                    naming_conflicts,
                     f"{base_path}.responses",
                     warnings,
                 ),

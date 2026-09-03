@@ -19,7 +19,12 @@ from ingestion_service.project_picker import prompt_for_project
 
 from .endpoint_extraction import extract_endpoints
 from .md_generation import generate_markdown
-from .ref_resolution import resolve_with_prance
+from .ref_resolution import (
+    compute_ref_status,
+    find_refs_in,
+    resolve_external_schema_placements,
+    resolve_with_prance,
+)
 from .schema_extraction import extract_schemas
 
 INPUTS_DIR = Path("project-data-S3") / "inputs"
@@ -48,26 +53,43 @@ def _extract_security(spec: dict[str, Any]) -> dict[str, Any]:
 
 def run_extraction(
     swagger_path: Path, userstories_path: Path | None
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, bool]]:
     """Pure extraction: reads the two input files and returns
-    (extracted_data, raw_spec). No interactive I/O beyond progress prints -
-    safe to call from a future orchestrator."""
+    (extracted_data, raw_spec, ref_status). No interactive I/O beyond
+    progress prints - safe to call from a future orchestrator."""
     print(f"  Reading {swagger_path}...")
     raw_spec = json.loads(swagger_path.read_text(encoding="utf-8"))
+    base_url = swagger_path.resolve().as_uri()
+
+    print("  Checking $ref resolvability (internal + external files/URLs)...")
+    ref_status, fetch_cache = compute_ref_status(raw_spec, base_url)
 
     print("  Resolving $refs (prance)...")
-    resolved_spec, broken_occurrences = resolve_with_prance(raw_spec)
+    resolved_spec, broken_occurrences = resolve_with_prance(raw_spec, base_url, ref_status, fetch_cache)
     warnings: list[str] = [f"Unresolvable $ref: {path} -> {ref}" for ref, path in broken_occurrences]
+
+    # Two different external refs (or an external ref and an internal
+    # schema) can legitimately resolve to the same trailing name; the
+    # loser of that naming conflict can't safely collapse to a bare name
+    # at its usage sites without silently pointing at the wrong schema.
+    external_winners, naming_conflicts = resolve_external_schema_placements(raw_spec, ref_status)
+    warnings.extend(
+        f"Naming conflict: {path} -> {ref} ({naming_conflicts[ref]})"
+        for ref, path in find_refs_in(raw_spec)
+        if ref in naming_conflicts
+    )
 
     print("  Extracting metadata and security...")
     metadata = _extract_metadata(raw_spec)
     security = _extract_security(raw_spec)
 
     print("  Extracting schemas...")
-    schemas = extract_schemas(raw_spec, resolved_spec, warnings)
+    schemas = extract_schemas(
+        raw_spec, resolved_spec, warnings, ref_status, naming_conflicts, external_winners, base_url, fetch_cache
+    )
 
     print("  Extracting endpoints...")
-    endpoints = extract_endpoints(raw_spec, resolved_spec, warnings)
+    endpoints = extract_endpoints(raw_spec, resolved_spec, warnings, ref_status, naming_conflicts)
 
     print("  Reading user stories...")
     user_stories = userstories_path.read_text(encoding="utf-8") if userstories_path else None
@@ -80,7 +102,7 @@ def run_extraction(
         "user_stories": user_stories,
         "warnings": warnings,
     }
-    return data, raw_spec
+    return data, raw_spec, ref_status
 
 
 def main() -> int:
@@ -97,7 +119,7 @@ def main() -> int:
         return 1
 
     print("\nStep 3/4: Extracting data...")
-    data, raw_spec = run_extraction(project.swagger_path, project.userstories_path)
+    data, raw_spec, ref_status = run_extraction(project.swagger_path, project.userstories_path)
 
     print("\nStep 4/4: Writing output files...")
     project_outputs_dir = OUTPUTS_DIR / project.name
@@ -108,7 +130,7 @@ def main() -> int:
     print(f"  Wrote {json_path}")
 
     md_path = project_outputs_dir / "extracted_data.md"
-    md_path.write_text(generate_markdown(data, raw_spec), encoding="utf-8")
+    md_path.write_text(generate_markdown(data, raw_spec, ref_status), encoding="utf-8")
     print(f"  Wrote {md_path}")
 
     print("\nDone.")

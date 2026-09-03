@@ -1,57 +1,93 @@
 """$ref handling for the extractor.
 
-Two separate concerns live here:
+Several concerns live here:
 
-1. Raw-spec pointer checks (ref_resolves, find_refs_in) - used to pre-scan
-   the *unresolved* document for broken $refs before handing it to prance,
-   since prance aborts its whole resolve on the first unresolvable pointer.
-   Broken spots get patched to `{}` in a copy so prance can resolve
-   everything else; the originals are what actually get reported.
+1. compute_ref_status() - the single place resolvability is actually
+   determined, for every DISTINCT $ref in the document, exactly once:
+   - An internal '#/...' ref is checked with a local, in-memory JSON
+     pointer walk (_internal_ref_resolves) - no I/O, cannot fail for any
+     reason other than the pointer genuinely not existing.
+   - An external ref (a local file path or a remote URL, with or without
+     a '#/json/pointer' fragment) is checked with a REAL resolution
+     attempt via prance's own fetch/parse utilities
+     (_external_ref_resolves) - actually reading the file or making the
+     HTTP request. Any failure (file not found, unreachable host, HTTP
+     error, network error, a pointer missing from an otherwise-fetched
+     document) marks it unresolvable; nothing else does. This runs on a
+     bounded, daemonized worker thread per ref, since prance/requests set
+     no socket timeout internally and a hung connection must not be able
+     to block extraction (or the process exiting) forever.
+   Every other function below is handed the resulting ref -> resolved?
+   dict rather than re-deciding resolvability itself, so every part of
+   the pipeline (JSON extraction, the broken-ref pre-scan, the MD
+   affected-endpoints computation) agrees on the same answer for the same
+   ref, and an external target is only ever actually fetched once even if
+   many places in the document reference it.
 
-2. resolve_with_prance() - runs prance's ResolvingParser on the patched
-   spec to get a fully-inlined version, configured to stop at recursion
-   limits (self/mutually-referencing schemas) by leaving a $ref in place
-   rather than raising.
+2. resolve_with_prance() - patches only the refs compute_ref_status found
+   broken, then resolves the rest (internal AND external - RESOLVE_ALL)
+   with prance's RefResolver directly (not ResolvingParser/BaseParser -
+   those also run an OpenAPI meta-schema validation pass after resolving,
+   which is Hard Gates' job, not extraction's, and which independently
+   blows the recursion limit on the exact same bare-self-ref schemas
+   already being guarded against here), configured to stop at recursion
+   limits by leaving a $ref in place rather than raising.
 
 3. build_clean_view() - the "clean internal format" builder. Walks the RAW
    spec (never the resolved one) as the structural driver: wherever raw
-   holds a bare {"$ref": "..."} pointing at a resolvable named component,
+   holds a bare {"$ref": "..."} that compute_ref_status found resolvable,
    it's collapsed to that component's bare name string - never inlined,
-   never rendered as an anonymous object. A broken $ref keeps its raw
-   {"$ref": "...", "unresolvable": true} form - the extra flag marks the
-   exact spot inline, in addition to the summary in warnings (reported
-   once, comprehensively, by resolve_with_prance's whole-document
-   pre-scan - not re-logged per occurrence here). Everything else (plain inline structure
-   with no $ref at that position) is copied from the RESOLVED spec instead,
-   so accuracy of nested/derived content still benefits from prance's
-   resolution. Recursion stops the instant a $ref is found - the walker
-   never follows a ref's target, so a schema cycle (even a bare
-   self-reference) cannot cause infinite recursion here.
+   never rendered as an anonymous object, regardless of whether the
+   target was internal, a local file, or a remote URL. A broken $ref
+   keeps its raw {"$ref": "...", "unresolvable": true} form (warnings for
+   these are reported once, comprehensively, by resolve_with_prance's
+   whole-document pre-scan - not re-logged per occurrence here).
+   Everything else (plain inline structure with no $ref at that position)
+   is copied from the RESOLVED spec instead, so accuracy of
+   nested/derived content still benefits from prance's resolution.
+   Recursion stops the instant a $ref is found - the walker never follows
+   a ref's target, so a schema cycle (even a bare self-reference) cannot
+   cause infinite recursion here.
+
+4. resolve_external_schema_placements() - a successfully-resolved
+   EXTERNAL ref's target name (e.g. 'Widget' from
+   'other-file.json#/components/schemas/Widget') gets its actual fetched
+   content added to the schemas section under that name too, not just
+   collapsed to a bare-name reference at each usage site - otherwise
+   there'd be nothing anywhere defining what that name means. Since two
+   different external refs (or an external ref and an internal schema)
+   can legitimately resolve to the same trailing name, this decides who
+   wins that name (first occurrence in document order; an internal schema
+   always wins over any external one) and flags every losing ref as a
+   naming conflict. build_clean_view renders a losing ref's usage sites
+   as an {"unresolvable": true, "reason": ...} placeholder rather than a
+   bare name, since collapsing it to a name that actually belongs to a
+   different schema would be actively misleading.
 """
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
-import prance
+from prance.util import path as prance_path
 from prance.util import resolver as prance_resolver
+from prance.util import url as prance_url
 from prance.util.resolver import RefResolver
 
 _MAX_MERGE_DEPTH = 200
+_EXTERNAL_REF_TIMEOUT_SECONDS = 10
 
 
 def ref_target_name(ref: str) -> str:
     """Trailing name segment of a $ref pointer, e.g.
-    '#/components/schemas/Pet' -> 'Pet'."""
+    '#/components/schemas/Pet' -> 'Pet', or
+    'https://example.com/schemas/common.json#/Address' -> 'Address'."""
     return ref.rstrip("/").rsplit("/", 1)[-1]
 
 
-def ref_resolves(ref: str, spec: dict[str, Any]) -> bool:
-    """Whether a $ref pointer resolves within this document. External refs
-    (not starting with '#/') are unresolvable - extraction only reads the
-    one swagger.json file."""
-    if not ref.startswith("#/"):
-        return False
+def _internal_ref_resolves(ref: str, spec: dict[str, Any]) -> bool:
+    """Local, in-memory JSON-pointer walk for a '#/...' fragment ref."""
     node: Any = spec
     for part in ref[2:].split("/"):
         part = part.replace("~1", "/").replace("~0", "~")
@@ -67,12 +103,126 @@ def ref_resolves(ref: str, spec: dict[str, Any]) -> bool:
     return True
 
 
+def _fetch_external_value(ref: str, base_url: str, cache: dict[Any, Any]) -> Any:
+    """Fetch and return the actual value an external $ref points to.
+    Raises on any failure - file not found, unreachable host, HTTP error,
+    malformed document, or a pointer that doesn't exist inside an
+    otherwise-fetched document."""
+    ref_url, obj_path = prance_url.split_url_reference(base_url, ref)
+    contents = prance_url.fetch_url(ref_url, cache, None, True)
+    if obj_path:
+        return prance_path.path_get(contents, obj_path)
+    return contents
+
+
+def resolve_external_ref_value(ref: str, base_url: str, cache: dict[Any, Any]) -> Any:
+    """Return the resolved value for an external $ref already confirmed
+    resolvable by compute_ref_status. Reuses the shared fetch cache, so
+    this is a cache hit (no new network/file I/O) rather than a
+    re-fetch - used by schema_extraction to harvest the actual schema
+    body for a successfully-resolved external ref."""
+    return _fetch_external_value(ref, base_url, cache)
+
+
+def _external_ref_resolves(ref: str, base_url: str, cache: dict[Any, Any]) -> bool:
+    """Real resolution attempt for an external ref, bounded by
+    _EXTERNAL_REF_TIMEOUT_SECONDS. Runs on a daemon thread: prance sets no
+    socket timeout on its own HTTP fetches, so a genuinely hung connection
+    has no clean way to be cancelled mid-flight - a daemon thread lets
+    this function give up and return promptly without that stuck thread
+    blocking the rest of extraction, or later blocking the process from
+    exiting the way a non-daemon thread pool worker would."""
+    outcome: dict[str, bool] = {}
+
+    def worker() -> None:
+        try:
+            _fetch_external_value(ref, base_url, cache)
+            outcome["ok"] = True
+        except Exception:
+            outcome["ok"] = False
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    thread.join(timeout=_EXTERNAL_REF_TIMEOUT_SECONDS)
+    return outcome.get("ok", False)
+
+
+def compute_ref_status(raw_spec: dict[str, Any], base_url: str) -> tuple[dict[str, bool], dict[Any, Any]]:
+    """Resolve every distinct $ref in the document exactly once. Returns
+    (status, fetch_cache) - status maps each ref string to whether it
+    resolved; fetch_cache accumulates every externally-fetched document,
+    in prance's own cache format, so resolve_with_prance's later real
+    resolve pass can reuse them instead of re-fetching."""
+    cache: dict[Any, Any] = {}
+    status: dict[str, bool] = {}
+    for ref, _path in find_refs_in(raw_spec):
+        if ref in status:
+            continue
+        if ref.startswith("#/"):
+            status[ref] = _internal_ref_resolves(ref, raw_spec)
+        else:
+            status[ref] = _external_ref_resolves(ref, base_url, cache)
+    return status, cache
+
+
 def find_refs_in(node: Any, path: str = "$") -> list[tuple[str, str]]:
     """Every ($ref, path) pair found anywhere under node. Never follows a
     ref's target, so this terminates even on a cyclic document."""
     found: list[tuple[str, str]] = []
     _walk_find(node, path, found)
     return found
+
+
+_CONFLICT_REASON_VS_EXTERNAL = "naming conflict — schema name already exists from another external ref"
+_CONFLICT_REASON_VS_INTERNAL = "naming conflict — schema name already exists as an internal schema in this document"
+
+
+def resolve_external_schema_placements(
+    raw_spec: dict[str, Any], ref_status: dict[str, bool]
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Decide, among all successfully-resolved EXTERNAL refs, which one
+    gets to claim its target name in the schemas section. An internal
+    schema of that name (already present in components.schemas) always
+    wins by default, since it's already fully and correctly represented
+    there. Among external refs, the first occurrence (in document order)
+    wins; every later external ref that would collide with an
+    already-claimed name - whether that name belongs to an internal
+    schema or to an earlier external ref - is a naming conflict: letting
+    it collapse to that bare name would silently point at content that
+    isn't actually its own.
+
+    Returns (winners, conflicts):
+      - winners: schema name -> the external ref that claimed it (only
+        for names not already used by an internal schema) - the refs
+        extract_schemas should fetch content for.
+      - conflicts: losing external ref -> reason string. build_clean_view
+        renders these as a conflict placeholder at their usage site
+        instead of a bare name."""
+    claimed_by: dict[str, str] = {
+        name: "internal" for name in raw_spec.get("components", {}).get("schemas", {})
+    }
+    winners: dict[str, str] = {}
+    conflicts: dict[str, str] = {}
+    seen: set[str] = set()
+
+    for ref, _path in find_refs_in(raw_spec):
+        if ref in seen or ref.startswith("#/"):
+            continue
+        seen.add(ref)
+        if not ref_status.get(ref, False):
+            continue
+
+        name = ref_target_name(ref)
+        holder = claimed_by.get(name)
+        if holder == "internal":
+            conflicts[ref] = _CONFLICT_REASON_VS_INTERNAL
+        elif holder is not None:
+            conflicts[ref] = _CONFLICT_REASON_VS_EXTERNAL
+        else:
+            claimed_by[name] = ref
+            winners[name] = ref
+
+    return winners, conflicts
 
 
 def _walk_find(node: Any, path: str, found: list[tuple[str, str]]) -> None:
@@ -98,41 +248,49 @@ def _patch_broken(node: Any, broken_targets: set[str]) -> Any:
     return node
 
 
-def resolve_with_prance(raw_spec: dict[str, Any]) -> tuple[dict[str, Any], list[tuple[str, str]]]:
-    """Pre-scan the WHOLE raw_spec document for broken $refs (not just the
-    schemas/paths subtrees the extractor walks - this also catches a
-    broken ref sitting in components.parameters or anywhere else), patch
-    just those spots, then resolve the patched copy with prance's
-    RefResolver directly (not ResolvingParser/BaseParser - those also run
-    an OpenAPI meta-schema validation pass after resolving, which is
-    Hard Gates' job, not extraction's, and which independently blows the
-    recursion limit on the exact same bare-self-ref schemas we're already
-    guarding against here). Returns (resolved_spec, broken_ref_occurrences)
-    where each occurrence is a (ref, path) pair - one per place a broken
-    ref appears, since the same broken target can be referenced from
-    multiple spots. Broken refs never reach the resolver, so this never
-    raises on them; a recursive schema is handled by configuring the
-    resolver to leave a $ref in place once its recursion limit is hit,
-    instead of raising or unrolling indefinitely."""
+def resolve_with_prance(
+    raw_spec: dict[str, Any],
+    base_url: str,
+    ref_status: dict[str, bool],
+    fetch_cache: dict[Any, Any] | None = None,
+) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+    """Patch only the refs ref_status found broken, then resolve the rest
+    - internal AND external (RESOLVE_ALL) - with prance's RefResolver.
+    Returns (resolved_spec, broken_ref_occurrences) where each occurrence
+    is a (ref, path) pair - one per place a broken ref appears, since the
+    same broken target can be referenced from multiple spots. Every ref
+    reaching the resolver was already confirmed resolvable by
+    compute_ref_status, so this should not itself fail on a broken
+    ref - but network state can change between the two calls, so any
+    resolver failure here still falls back to leaving the document
+    unresolved rather than crashing extraction."""
     all_refs = find_refs_in(raw_spec)
-    broken_occurrences = [(ref, path) for ref, path in all_refs if not ref_resolves(ref, raw_spec)]
+    broken_occurrences = [(ref, path) for ref, path in all_refs if not ref_status.get(ref, False)]
     broken_targets = {ref for ref, _ in broken_occurrences}
 
     patched = _patch_broken(raw_spec, broken_targets) if broken_targets else raw_spec
 
     resolver = RefResolver(
         patched,
-        url=prance._PLACEHOLDER_URL,
+        url=base_url,
+        resolve_types=prance_resolver.RESOLVE_ALL,
         recursion_limit_handler=prance_resolver.keep_ref_on_recursion,
+        reference_cache=fetch_cache if fetch_cache is not None else {},
     )
-    resolver.resolve_references()
-    return resolver.specs, broken_occurrences
+    try:
+        resolver.resolve_references()
+        resolved_spec = resolver.specs
+    except Exception:
+        resolved_spec = patched
+
+    return resolved_spec, broken_occurrences
 
 
 def build_clean_view(
     raw_node: Any,
     resolved_node: Any,
-    raw_spec: dict[str, Any],
+    ref_status: dict[str, bool],
+    naming_conflicts: dict[str, str],
     path: str,
     warnings: list[str],
     _depth: int = 0,
@@ -145,7 +303,14 @@ def build_clean_view(
 
     if isinstance(raw_node, dict) and isinstance(raw_node.get("$ref"), str):
         ref = raw_node["$ref"]
-        if ref_resolves(ref, raw_spec):
+        if ref in naming_conflicts:
+            # This ref resolved fine on its own, but its target name is
+            # already claimed by a different schema - collapsing to that
+            # bare name here would silently point at the wrong content,
+            # so this usage site is treated as unresolvable instead
+            # (warning logged once by the caller).
+            return {"unresolvable": True, "ref": ref, "reason": naming_conflicts[ref]}
+        if ref_status.get(ref, False):
             return ref_target_name(ref)
         # Broken refs are reported once, comprehensively, by
         # resolve_with_prance's whole-document pre-scan - not re-logged
@@ -157,7 +322,13 @@ def build_clean_view(
         resolved_dict = resolved_node if isinstance(resolved_node, dict) else {}
         return {
             key: build_clean_view(
-                value, resolved_dict.get(key), raw_spec, f"{path}.{key}", warnings, _depth + 1
+                value,
+                resolved_dict.get(key),
+                ref_status,
+                naming_conflicts,
+                f"{path}.{key}",
+                warnings,
+                _depth + 1,
             )
             for key, value in raw_node.items()
         }
@@ -168,7 +339,8 @@ def build_clean_view(
             build_clean_view(
                 item,
                 resolved_list[i] if i < len(resolved_list) else None,
-                raw_spec,
+                ref_status,
+                naming_conflicts,
                 f"{path}[{i}]",
                 warnings,
                 _depth + 1,
@@ -221,7 +393,7 @@ def direct_schema_names_used(node: Any) -> set[str]:
     return names
 
 
-def direct_broken_refs(node: Any, raw_spec: dict[str, Any]) -> set[str]:
+def direct_broken_refs(node: Any, ref_status: dict[str, bool]) -> set[str]:
     """Broken $ref pointers found directly within a raw subtree (not
     counting ones only reachable through a referenced schema's own body)."""
-    return {ref for ref, _ in find_refs_in(node) if not ref_resolves(ref, raw_spec)}
+    return {ref for ref, _ in find_refs_in(node) if not ref_status.get(ref, False)}

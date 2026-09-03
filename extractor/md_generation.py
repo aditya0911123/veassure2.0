@@ -374,7 +374,9 @@ def _render_responses(responses: dict[str, Any] | None, lines: list[str], indent
             _render_content_schemas(response.get("content"), lines, indent + "  ")
 
 
-def _compute_affected_endpoints(raw_spec: dict[str, Any], broken_refs: list[str]) -> list[str]:
+def _compute_affected_endpoints(
+    raw_spec: dict[str, Any], broken_refs: list[str], ref_status: dict[str, bool]
+) -> list[str]:
     broken_set = set(broken_refs)
     affected: list[str] = []
 
@@ -394,7 +396,7 @@ def _compute_affected_endpoints(raw_spec: dict[str, Any], broken_refs: list[str]
                 "responses": operation.get("responses", {}),
             }
 
-            found = direct_broken_refs(subtree, raw_spec)
+            found = direct_broken_refs(subtree, ref_status)
             for name in direct_schema_names_used(subtree):
                 found |= broken_refs_reachable_from_schema(name, raw_spec, broken_set)
 
@@ -408,7 +410,7 @@ def _section(title: str) -> list[str]:
     return [f"## {title}", ""]
 
 
-def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any]) -> str:
+def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any], ref_status: dict[str, bool]) -> str:
     lines: list[str] = ["# Extracted API Data", ""]
 
     meta = data["metadata"]
@@ -468,7 +470,7 @@ def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any]) -> str:
     lines.append("")
 
     broken_refs = [w.split(" -> ", 1)[1] for w in data["warnings"] if w.startswith("Unresolvable $ref:")]
-    affected_endpoints = _compute_affected_endpoints(raw_spec, broken_refs)
+    affected_endpoints = _compute_affected_endpoints(raw_spec, broken_refs, ref_status)
     lines += _section("Broken $ref Summary")
     lines.append(f"- Total broken $ref occurrences: {len(broken_refs)}")
     lines.append(f"- Affected endpoints: {len(affected_endpoints)}")

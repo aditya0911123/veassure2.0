@@ -1,0 +1,14 @@
+{
+  "components": {
+    "schemas": {
+      "Widget": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string", "enum": ["file-b"] }
+        },
+        "required": ["id"]
+      }
+    }
+  }
+}
