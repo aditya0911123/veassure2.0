@@ -51,6 +51,9 @@ def gate1_parse_file(path: Path, result: GateResult) -> dict[str, Any] | None:
     except OSError as exc:
         result.errors.append(f"File Parsing: could not read file ({exc})")
         return None
+    except UnicodeDecodeError as exc:
+        result.errors.append(f"File Parsing: file is not valid UTF-8 ({exc})")
+        return None
 
     try:
         spec = json.loads(raw)

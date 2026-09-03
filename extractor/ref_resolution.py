@@ -3,20 +3,22 @@
 Several concerns live here:
 
 1. compute_ref_status() - the single place resolvability is actually
-   determined, for every DISTINCT $ref in the document, exactly once:
-   - An internal '#/...' ref is checked with a local, in-memory JSON
-     pointer walk (_internal_ref_resolves) - no I/O, cannot fail for any
-     reason other than the pointer genuinely not existing.
-   - An external ref (a local file path or a remote URL, with or without
-     a '#/json/pointer' fragment) is checked with a REAL resolution
-     attempt via prance's own fetch/parse utilities
-     (_external_ref_resolves) - actually reading the file or making the
-     HTTP request. Any failure (file not found, unreachable host, HTTP
-     error, network error, a pointer missing from an otherwise-fetched
-     document) marks it unresolvable; nothing else does. This runs on a
-     bounded, daemonized worker thread per ref, since prance/requests set
-     no socket timeout internally and a hung connection must not be able
-     to block extraction (or the process exiting) forever.
+   determined, for every DISTINCT $ref in the document, exactly once, via
+   ONE mechanism (_fetch_ref_value) used for both internal and external
+   refs alike - prance's own fetch/parse/pointer utilities. An internal
+   '#/...' ref resolves against the base document itself (fetched once,
+   cached thereafter, so no repeated disk I/O); an external ref (a local
+   file path or a remote URL, with or without a '#/json/pointer'
+   fragment) genuinely reads the file or makes the HTTP request. Any
+   failure (a pointer segment that doesn't exist, file not found,
+   unreachable host, HTTP error, network error, malformed document) marks
+   it unresolvable; nothing else does. The only thing that still differs
+   between the two ref kinds is timing, not mechanism: an internal ref
+   can never hang (no network, cached after the first call) so it
+   resolves immediately with no threading involved, while an external ref
+   is wrapped in a bounded, daemonized worker thread, since prance/
+   requests set no socket timeout internally and a hung connection must
+   not be able to block extraction (or the process exiting) forever.
    Every other function below is handed the resulting ref -> resolved?
    dict rather than re-deciding resolvability itself, so every part of
    the pipeline (JSON extraction, the broken-ref pre-scan, the MD
@@ -86,28 +88,17 @@ def ref_target_name(ref: str) -> str:
     return ref.rstrip("/").rsplit("/", 1)[-1]
 
 
-def _internal_ref_resolves(ref: str, spec: dict[str, Any]) -> bool:
-    """Local, in-memory JSON-pointer walk for a '#/...' fragment ref."""
-    node: Any = spec
-    for part in ref[2:].split("/"):
-        part = part.replace("~1", "/").replace("~0", "~")
-        if isinstance(node, dict) and part in node:
-            node = node[part]
-        elif isinstance(node, list):
-            try:
-                node = node[int(part)]
-            except (ValueError, IndexError):
-                return False
-        else:
-            return False
-    return True
-
-
-def _fetch_external_value(ref: str, base_url: str, cache: dict[Any, Any]) -> Any:
-    """Fetch and return the actual value an external $ref points to.
-    Raises on any failure - file not found, unreachable host, HTTP error,
-    malformed document, or a pointer that doesn't exist inside an
-    otherwise-fetched document."""
+def _fetch_ref_value(ref: str, base_url: str, cache: dict[Any, Any]) -> Any:
+    """Resolve and return the value ANY $ref points to - internal
+    ('#/...', resolved against the base document itself) or external (a
+    local file or a remote URL) - via prance's own fetch/parse/pointer
+    utilities. This is the single mechanism underlying both; there is no
+    separate hand-rolled path for internal refs. Raises on any failure: a
+    pointer segment that doesn't exist, a file that isn't there, an
+    unreachable host, an HTTP error, or a malformed document. The base
+    document itself is fetched (read + parsed) once and cached under its
+    own URL, so every internal ref after the first is a cache hit with no
+    further disk I/O."""
     ref_url, obj_path = prance_url.split_url_reference(base_url, ref)
     contents = prance_url.fetch_url(ref_url, cache, None, True)
     if obj_path:
@@ -121,11 +112,25 @@ def resolve_external_ref_value(ref: str, base_url: str, cache: dict[Any, Any]) -
     this is a cache hit (no new network/file I/O) rather than a
     re-fetch - used by schema_extraction to harvest the actual schema
     body for a successfully-resolved external ref."""
-    return _fetch_external_value(ref, base_url, cache)
+    return _fetch_ref_value(ref, base_url, cache)
 
 
-def _external_ref_resolves(ref: str, base_url: str, cache: dict[Any, Any]) -> bool:
-    """Real resolution attempt for an external ref, bounded by
+def _resolve_ref_now(ref: str, base_url: str, cache: dict[Any, Any]) -> bool:
+    """Resolve an internal '#/...' ref immediately, with no timeout
+    guard. This never performs network I/O, and after the very first call
+    in a given compute_ref_status pass it never even touches disk again -
+    the base document is cached on its first fetch - so there is nothing
+    here that can hang, and wrapping it in the timeout machinery used for
+    external refs would only add pointless overhead."""
+    try:
+        _fetch_ref_value(ref, base_url, cache)
+        return True
+    except Exception:
+        return False
+
+
+def _resolve_ref_with_timeout(ref: str, base_url: str, cache: dict[Any, Any]) -> bool:
+    """Resolve an external ref (a local file or a remote URL), bounded by
     _EXTERNAL_REF_TIMEOUT_SECONDS. Runs on a daemon thread: prance sets no
     socket timeout on its own HTTP fetches, so a genuinely hung connection
     has no clean way to be cancelled mid-flight - a daemon thread lets
@@ -136,7 +141,7 @@ def _external_ref_resolves(ref: str, base_url: str, cache: dict[Any, Any]) -> bo
 
     def worker() -> None:
         try:
-            _fetch_external_value(ref, base_url, cache)
+            _fetch_ref_value(ref, base_url, cache)
             outcome["ok"] = True
         except Exception:
             outcome["ok"] = False
@@ -148,20 +153,30 @@ def _external_ref_resolves(ref: str, base_url: str, cache: dict[Any, Any]) -> bo
 
 
 def compute_ref_status(raw_spec: dict[str, Any], base_url: str) -> tuple[dict[str, bool], dict[Any, Any]]:
-    """Resolve every distinct $ref in the document exactly once. Returns
-    (status, fetch_cache) - status maps each ref string to whether it
-    resolved; fetch_cache accumulates every externally-fetched document,
-    in prance's own cache format, so resolve_with_prance's later real
-    resolve pass can reuse them instead of re-fetching."""
+    """Resolve every distinct $ref in the document exactly once, via
+    _fetch_ref_value - the single prance-based mechanism used for both
+    internal and external refs, replacing what used to be two separate
+    implementations (a hand-rolled in-memory pointer walk for internal
+    refs, prance's fetch utilities for external ones). The only thing
+    that still differs between the two branches below is whether a
+    timeout guard applies: an internal ref can never hang (no network,
+    and the base document is cached after its first fetch), so it
+    resolves immediately with no threading involved; an external ref is a
+    real file or network fetch and is bounded by the daemon-thread
+    timeout. Returns (status, fetch_cache) - status maps each ref string
+    to whether it resolved; fetch_cache accumulates every fetched
+    document (the base document included), in prance's own cache format,
+    so resolve_with_prance's later real resolve pass can reuse them
+    instead of re-fetching."""
     cache: dict[Any, Any] = {}
     status: dict[str, bool] = {}
     for ref, _path in find_refs_in(raw_spec):
         if ref in status:
             continue
         if ref.startswith("#/"):
-            status[ref] = _internal_ref_resolves(ref, raw_spec)
+            status[ref] = _resolve_ref_now(ref, base_url, cache)
         else:
-            status[ref] = _external_ref_resolves(ref, base_url, cache)
+            status[ref] = _resolve_ref_with_timeout(ref, base_url, cache)
     return status, cache
 
 
