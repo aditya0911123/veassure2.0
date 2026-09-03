@@ -53,6 +53,5 @@
       ]
     }
   },
-  "user_stories": "As a user, I want to list all pets so that I can see what's available.\nAs a user, I want to view a pet's friend relationship.\n",
-  "warnings": []
+  "user_stories": "As a user, I want to list all pets so that I can see what's available.\nAs a user, I want to view a pet's friend relationship.\n"
 }

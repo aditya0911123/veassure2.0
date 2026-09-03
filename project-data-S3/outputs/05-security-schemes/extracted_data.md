@@ -99,12 +99,3 @@ As an authenticated user, I want to list my payments.
 As an authenticated app (via OAuth2), I want to create a payment on a user's behalf.
 As an operator, I want to check service health without authenticating.
 
-
-## Warnings
-
-- none
-
-## Broken $ref Summary
-
-- Total broken $ref occurrences: 0
-- Affected endpoints: 0

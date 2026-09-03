@@ -185,6 +185,5 @@
       ]
     }
   },
-  "user_stories": "As a shopper, I want to see a list of all books so that I can browse the catalog.\nAs a shopper, I want to view a single book's details before buying it.\nAs an admin, I want to add new books to the catalog.\nAs an admin, I want to remove books that are no longer sold.\n",
-  "warnings": []
+  "user_stories": "As a shopper, I want to see a list of all books so that I can browse the catalog.\nAs a shopper, I want to view a single book's details before buying it.\nAs an admin, I want to add new books to the catalog.\nAs an admin, I want to remove books that are no longer sold.\n"
 }

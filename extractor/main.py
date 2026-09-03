@@ -53,10 +53,22 @@ def _extract_security(spec: dict[str, Any]) -> dict[str, Any]:
 
 def run_extraction(
     swagger_path: Path, userstories_path: Path | None
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, bool]]:
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, bool], list[dict[str, str]]]:
     """Pure extraction: reads the two input files and returns
-    (extracted_data, raw_spec, ref_status). No interactive I/O beyond
-    progress prints - safe to call from a future orchestrator."""
+    (extracted_data, raw_spec, ref_status, broken_refs). No interactive
+    I/O beyond progress prints - safe to call from a future orchestrator.
+
+    broken_refs is the full detail of every broken/unresolvable ref and
+    naming conflict found during extraction - one dict per occurrence,
+    each with at least "type" ("unresolvable" | "naming_conflict" |
+    "depth_guard") and "path"/"ref" (plus "reason" for naming conflicts).
+    It is deliberately NOT written to extracted_data.json or .md - at a
+    usage site a problem ref just collapses to {}, indistinguishable from
+    an intentionally empty schema, and neither output file carries a
+    warnings/summary section any more. This structure is extraction's own
+    record of what got flagged, meant for the Part 3 validation agent to
+    consume and fold into validation_report.md - not for either of this
+    part's own deliverables."""
     print(f"  Reading {swagger_path}...")
     raw_spec = json.loads(swagger_path.read_text(encoding="utf-8"))
     base_url = swagger_path.resolve().as_uri()
@@ -66,15 +78,17 @@ def run_extraction(
 
     print("  Resolving $refs (prance)...")
     resolved_spec, broken_occurrences = resolve_with_prance(raw_spec, base_url, ref_status, fetch_cache)
-    warnings: list[str] = [f"Unresolvable $ref: {path} -> {ref}" for ref, path in broken_occurrences]
+    broken_refs: list[dict[str, str]] = [
+        {"type": "unresolvable", "path": path, "ref": ref} for ref, path in broken_occurrences
+    ]
 
     # Two different external refs (or an external ref and an internal
     # schema) can legitimately resolve to the same trailing name; the
     # loser of that naming conflict can't safely collapse to a bare name
     # at its usage sites without silently pointing at the wrong schema.
     external_winners, naming_conflicts = resolve_external_schema_placements(raw_spec, ref_status)
-    warnings.extend(
-        f"Naming conflict: {path} -> {ref} ({naming_conflicts[ref]})"
+    broken_refs.extend(
+        {"type": "naming_conflict", "path": path, "ref": ref, "reason": naming_conflicts[ref]}
         for ref, path in find_refs_in(raw_spec)
         if ref in naming_conflicts
     )
@@ -85,11 +99,11 @@ def run_extraction(
 
     print("  Extracting schemas...")
     schemas = extract_schemas(
-        raw_spec, resolved_spec, warnings, ref_status, naming_conflicts, external_winners, base_url, fetch_cache
+        raw_spec, resolved_spec, broken_refs, ref_status, naming_conflicts, external_winners, base_url, fetch_cache
     )
 
     print("  Extracting endpoints...")
-    endpoints = extract_endpoints(raw_spec, resolved_spec, warnings, ref_status, naming_conflicts)
+    endpoints = extract_endpoints(raw_spec, resolved_spec, broken_refs, ref_status, naming_conflicts)
 
     print("  Reading user stories...")
     user_stories = userstories_path.read_text(encoding="utf-8") if userstories_path else None
@@ -100,9 +114,8 @@ def run_extraction(
         "endpoints": endpoints,
         "schemas": schemas,
         "user_stories": user_stories,
-        "warnings": warnings,
     }
-    return data, raw_spec, ref_status
+    return data, raw_spec, ref_status, broken_refs
 
 
 def main() -> int:
@@ -119,7 +132,9 @@ def main() -> int:
         return 1
 
     print("\nStep 3/4: Extracting data...")
-    data, raw_spec, ref_status = run_extraction(project.swagger_path, project.userstories_path)
+    data, raw_spec, ref_status, broken_refs = run_extraction(project.swagger_path, project.userstories_path)
+    if broken_refs:
+        print(f"  Collected {len(broken_refs)} broken-ref detail(s) for Part 3 (not written to output files).")
 
     print("\nStep 4/4: Writing output files...")
     project_outputs_dir = OUTPUTS_DIR / project.name
@@ -130,7 +145,7 @@ def main() -> int:
     print(f"  Wrote {json_path}")
 
     md_path = project_outputs_dir / "extracted_data.md"
-    md_path.write_text(generate_markdown(data, raw_spec, ref_status), encoding="utf-8")
+    md_path.write_text(generate_markdown(data), encoding="utf-8")
     print(f"  Wrote {md_path}")
 
     print("\nDone.")

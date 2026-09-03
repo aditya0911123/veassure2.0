@@ -1229,17 +1229,7 @@
         "message"
       ]
     },
-    "GhostSchema": {
-      "unresolvable": true,
-      "ref": "#/components/schemas/DoesNotExist"
-    },
-    "DoesNotExist": {
-      "unresolvable": true,
-      "ref": "#/components/schemas/DoesNotExist"
-    }
+    "GhostSchema": {}
   },
-  "user_stories": null,
-  "warnings": [
-    "Unresolvable $ref: $.components.schemas.GhostSchema -> #/components/schemas/DoesNotExist"
-  ]
+  "user_stories": null
 }

@@ -47,7 +47,7 @@
   - (none)
 - Responses:
   - **200**: Invoice document
-    - application/json: ⚠️ unresolvable $ref → #/components/schemas/Invoice
+    - application/json: object
 
 ## Schemas
 
@@ -56,7 +56,7 @@
 - Properties:
   - **id**: string *(required)*
   - **customer**: `Customer`
-  - **shippingLabel**: ⚠️ unresolvable $ref → #/components/schemas/ShippingLabel
+  - **shippingLabel**: object
 
 ### Customer
 - Type: object
@@ -64,26 +64,8 @@
   - **name**: string
   - **email**: string
 
-### Invoice
-- ⚠️ unresolvable $ref → #/components/schemas/Invoice
-
-### ShippingLabel
-- ⚠️ unresolvable $ref → #/components/schemas/ShippingLabel
-
 ## User Stories
 
 As a customer, I want to view my past orders.
 As a customer, I want to download an invoice for an order.
 
-
-## Warnings
-
-- Unresolvable $ref: $.paths./orders/{orderId}/invoice.get.responses.200.content.application/json.schema -> #/components/schemas/Invoice
-- Unresolvable $ref: $.components.schemas.Order.properties.shippingLabel -> #/components/schemas/ShippingLabel
-
-## Broken $ref Summary
-
-- Total broken $ref occurrences: 2
-- Affected endpoints: 2
-  - GET /orders
-  - GET /orders/{orderId}/invoice

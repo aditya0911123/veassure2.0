@@ -40,16 +40,20 @@ Several concerns live here:
    holds a bare {"$ref": "..."} that compute_ref_status found resolvable,
    it's collapsed to that component's bare name string - never inlined,
    never rendered as an anonymous object, regardless of whether the
-   target was internal, a local file, or a remote URL. A broken $ref
-   keeps its raw {"$ref": "...", "unresolvable": true} form (warnings for
-   these are reported once, comprehensively, by resolve_with_prance's
-   whole-document pre-scan - not re-logged per occurrence here).
-   Everything else (plain inline structure with no $ref at that position)
-   is copied from the RESOLVED spec instead, so accuracy of
-   nested/derived content still benefits from prance's resolution.
-   Recursion stops the instant a $ref is found - the walker never follows
-   a ref's target, so a schema cycle (even a bare self-reference) cannot
-   cause infinite recursion here.
+   target was internal, a local file, or a remote URL. A ref that can't
+   safely collapse to a name - broken, or the loser of a naming conflict -
+   becomes a plain empty schema ({}) at its usage site; extracted_data.json
+   and .md carry no other trace of it. The full detail (which ref, at
+   which path, broken vs. naming conflict, and why) is collected
+   separately - see the module-level note in main.py's run_extraction -
+   into a report that's returned from extraction but never written to
+   either output file, for a future consumer (the Part 3 validation
+   agent) rather than for these two documents. Everything else (plain
+   inline structure with no $ref at that position) is copied from the
+   RESOLVED spec instead, so accuracy of nested/derived content still
+   benefits from prance's resolution. Recursion stops the instant a $ref
+   is found - the walker never follows a ref's target, so a schema cycle
+   (even a bare self-reference) cannot cause infinite recursion here.
 
 4. resolve_external_schema_placements() - a successfully-resolved
    EXTERNAL ref's target name (e.g. 'Widget' from
@@ -62,9 +66,8 @@ Several concerns live here:
    wins that name (first occurrence in document order; an internal schema
    always wins over any external one) and flags every losing ref as a
    naming conflict. build_clean_view renders a losing ref's usage sites
-   as an {"unresolvable": true, "reason": ...} placeholder rather than a
-   bare name, since collapsing it to a name that actually belongs to a
-   different schema would be actively misleading.
+   as {} rather than a bare name, since collapsing it to a name that
+   actually belongs to a different schema would be actively misleading.
 """
 
 from __future__ import annotations
@@ -307,31 +310,29 @@ def build_clean_view(
     ref_status: dict[str, bool],
     naming_conflicts: dict[str, str],
     path: str,
-    warnings: list[str],
+    broken_refs: list[dict[str, str]],
     _depth: int = 0,
 ) -> Any:
     """Build the clean internal representation of raw_node/resolved_node.
-    See module docstring for the substitution rule."""
+    See module docstring for the substitution rule.
+
+    A $ref that can't safely collapse to a bare name - because it's
+    genuinely broken, or because it lost a naming conflict - becomes a
+    plain empty schema ({}) at its usage site. Nothing about *why* is
+    recorded here: the full broken-ref/conflict detail is already fully
+    known up front (resolve_with_prance's broken_occurrences,
+    resolve_external_schema_placements' conflicts) and assembled once by
+    the caller into the report handed back from extraction - re-deriving
+    or re-logging it per usage site would just be duplicate bookkeeping."""
     if _depth > _MAX_MERGE_DEPTH:
-        warnings.append(f"Ref traversal depth guard triggered at {path}; stopped descending.")
+        broken_refs.append({"type": "depth_guard", "path": path})
         return None
 
     if isinstance(raw_node, dict) and isinstance(raw_node.get("$ref"), str):
         ref = raw_node["$ref"]
-        if ref in naming_conflicts:
-            # This ref resolved fine on its own, but its target name is
-            # already claimed by a different schema - collapsing to that
-            # bare name here would silently point at the wrong content,
-            # so this usage site is treated as unresolvable instead
-            # (warning logged once by the caller).
-            return {"unresolvable": True, "ref": ref, "reason": naming_conflicts[ref]}
-        if ref_status.get(ref, False):
-            return ref_target_name(ref)
-        # Broken refs are reported once, comprehensively, by
-        # resolve_with_prance's whole-document pre-scan - not re-logged
-        # here, to avoid duplicate/partial-coverage warnings. The inline
-        # marker below is what flags the exact spot in the JSON output.
-        return {"$ref": ref, "unresolvable": True}
+        if ref in naming_conflicts or not ref_status.get(ref, False):
+            return {}
+        return ref_target_name(ref)
 
     if isinstance(raw_node, dict):
         resolved_dict = resolved_node if isinstance(resolved_node, dict) else {}
@@ -342,7 +343,7 @@ def build_clean_view(
                 ref_status,
                 naming_conflicts,
                 f"{path}.{key}",
-                warnings,
+                broken_refs,
                 _depth + 1,
             )
             for key, value in raw_node.items()
@@ -357,7 +358,7 @@ def build_clean_view(
                 ref_status,
                 naming_conflicts,
                 f"{path}[{i}]",
-                warnings,
+                broken_refs,
                 _depth + 1,
             )
             for i, item in enumerate(raw_node)

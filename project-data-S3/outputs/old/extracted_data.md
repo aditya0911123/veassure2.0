@@ -137,12 +137,3 @@
 ## User Stories
 
 (none provided)
-
-## Warnings
-
-- none
-
-## Broken $ref Summary
-
-- Total broken $ref occurrences: 0
-- Affected endpoints: 0

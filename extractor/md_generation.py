@@ -1,32 +1,24 @@
 """Generates extracted_data.md - a human-readable mirror of
-extracted_data.json's six sections, plus a broken-$ref summary appended at
-the very end with a count of affected endpoints (an endpoint counts as
-affected if it directly holds a broken ref, or transitively uses a named
-schema whose own body contains one).
+extracted_data.json's five sections.
 
 Schemas and endpoints are rendered as readable markdown (headings/bullets),
 never as raw JSON dumps. A "schema slot" - any position that could hold a
 schema reference (a property value, array items, an allOf/oneOf/anyOf
 member, a parameter's schema, a response/request body schema) - is one of
-three things coming out of build_clean_view, and every renderer below
-switches on exactly these three shapes:
-  - a bare string  -> a resolved reference; rendered as `Name`
-  - {"$ref": ..., "unresolvable": true} -> a broken reference; rendered as
-    the inline warning glyph
-  - a plain dict with no "$ref" -> an inline schema, rendered in full
+two things coming out of build_clean_view, and every renderer below
+switches on exactly these two shapes:
+  - a bare string -> a resolved reference; rendered as `Name`
+  - a plain dict -> an inline schema, rendered in full (this includes {} -
+    a broken ref or a naming-conflict loser, which is indistinguishable
+    here from a schema that's genuinely empty; the detail of *why* lives
+    only in the broken_refs report returned from extraction, never in this
+    file - see run_extraction in main.py)
 """
 
 from __future__ import annotations
 
 import json
 from typing import Any
-
-from .endpoint_extraction import HTTP_METHODS
-from .ref_resolution import (
-    broken_refs_reachable_from_schema,
-    direct_broken_refs,
-    direct_schema_names_used,
-)
 
 _CONSTRAINT_KEYS = (
     "minimum",
@@ -46,19 +38,13 @@ _CONSTRAINT_KEYS = (
 
 
 def _ref_label(value: Any) -> str | None:
-    """If value is a schema-reference slot (resolved name string, or a
-    broken-ref marker), return its inline label. Otherwise None, meaning
-    the caller should render it as an inline schema instead.
-
-    Two broken-ref marker shapes exist: build_clean_view's inline
-    usage-site marker uses key "$ref", while extract_schemas' top-level
-    placeholder for a referenced-but-never-defined schema uses "ref" -
-    both are checked here."""
+    """If value is a resolved-reference slot (a bare name string), return
+    its inline label. Otherwise None, meaning the caller should render it
+    as an inline schema instead - including {}, the shape a broken or
+    naming-conflict-losing ref collapses to; there's nothing left at that
+    point to distinguish it from a genuinely empty schema, by design."""
     if isinstance(value, str):
         return f"`{value}`"
-    if isinstance(value, dict) and value.get("unresolvable"):
-        ref = value.get("$ref") or value.get("ref")
-        return f"⚠️ unresolvable $ref → {ref}"
     return None
 
 
@@ -173,7 +159,7 @@ def _render_schema_body(schema: Any, lines: list[str], indent: str = "", show_ty
 
     if schema.get("type") == "array":
         items = schema.get("items")
-        if isinstance(items, dict) and not items.get("unresolvable"):
+        if isinstance(items, dict):
             lines.append(f"{indent}- Items:")
             _render_schema_body(items, lines, indent + "  ")
 
@@ -374,43 +360,11 @@ def _render_responses(responses: dict[str, Any] | None, lines: list[str], indent
             _render_content_schemas(response.get("content"), lines, indent + "  ")
 
 
-def _compute_affected_endpoints(
-    raw_spec: dict[str, Any], broken_refs: list[str], ref_status: dict[str, bool]
-) -> list[str]:
-    broken_set = set(broken_refs)
-    affected: list[str] = []
-
-    for path, path_item in raw_spec.get("paths", {}).items():
-        if not isinstance(path_item, dict):
-            continue
-        shared_params = path_item.get("parameters", [])
-
-        for method in HTTP_METHODS:
-            operation = path_item.get(method)
-            if not isinstance(operation, dict):
-                continue
-
-            subtree = {
-                "parameters": shared_params + operation.get("parameters", []),
-                "requestBody": operation.get("requestBody"),
-                "responses": operation.get("responses", {}),
-            }
-
-            found = direct_broken_refs(subtree, ref_status)
-            for name in direct_schema_names_used(subtree):
-                found |= broken_refs_reachable_from_schema(name, raw_spec, broken_set)
-
-            if found:
-                affected.append(f"{method.upper()} {path}")
-
-    return affected
-
-
 def _section(title: str) -> list[str]:
     return [f"## {title}", ""]
 
 
-def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any], ref_status: dict[str, bool]) -> str:
+def generate_markdown(data: dict[str, Any]) -> str:
     lines: list[str] = ["# Extracted API Data", ""]
 
     meta = data["metadata"]
@@ -461,20 +415,5 @@ def generate_markdown(data: dict[str, Any], raw_spec: dict[str, Any], ref_status
     lines += _section("User Stories")
     lines.append(data["user_stories"] if data["user_stories"] else "(none provided)")
     lines.append("")
-
-    lines += _section("Warnings")
-    if data["warnings"]:
-        lines += [f"- {w}" for w in data["warnings"]]
-    else:
-        lines.append("- none")
-    lines.append("")
-
-    broken_refs = [w.split(" -> ", 1)[1] for w in data["warnings"] if w.startswith("Unresolvable $ref:")]
-    affected_endpoints = _compute_affected_endpoints(raw_spec, broken_refs, ref_status)
-    lines += _section("Broken $ref Summary")
-    lines.append(f"- Total broken $ref occurrences: {len(broken_refs)}")
-    lines.append(f"- Affected endpoints: {len(affected_endpoints)}")
-    for label in affected_endpoints:
-        lines.append(f"  - {label}")
 
     return "\n".join(lines)

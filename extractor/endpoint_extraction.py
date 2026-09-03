@@ -18,7 +18,7 @@ HTTP_METHODS = ("get", "put", "post", "delete", "options", "head", "patch", "tra
 def extract_endpoints(
     raw_spec: dict[str, Any],
     resolved_spec: dict[str, Any],
-    warnings: list[str],
+    broken_refs: list[dict[str, str]],
     ref_status: dict[str, bool],
     naming_conflicts: dict[str, str],
 ) -> list[dict[str, Any]]:
@@ -72,7 +72,7 @@ def extract_endpoints(
                     ref_status,
                     naming_conflicts,
                     f"{base_path}.parameters",
-                    warnings,
+                    broken_refs,
                 ),
                 "request_body": build_clean_view(
                     raw_operation.get("requestBody"),
@@ -80,7 +80,7 @@ def extract_endpoints(
                     ref_status,
                     naming_conflicts,
                     f"{base_path}.requestBody",
-                    warnings,
+                    broken_refs,
                 ),
                 "responses": build_clean_view(
                     raw_operation.get("responses", {}),
@@ -88,7 +88,7 @@ def extract_endpoints(
                     ref_status,
                     naming_conflicts,
                     f"{base_path}.responses",
-                    warnings,
+                    broken_refs,
                 ),
             }
             endpoints.append(entry)

@@ -104,12 +104,3 @@ As a shopper, I want to view a single book's details before buying it.
 As an admin, I want to add new books to the catalog.
 As an admin, I want to remove books that are no longer sold.
 
-
-## Warnings
-
-- none
-
-## Broken $ref Summary
-
-- Total broken $ref occurrences: 0
-- Affected endpoints: 0

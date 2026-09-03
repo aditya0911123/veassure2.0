@@ -169,6 +169,5 @@
       ]
     }
   },
-  "user_stories": "As an authenticated user, I want to list my payments.\nAs an authenticated app (via OAuth2), I want to create a payment on a user's behalf.\nAs an operator, I want to check service health without authenticating.\n",
-  "warnings": []
+  "user_stories": "As an authenticated user, I want to list my payments.\nAs an authenticated app (via OAuth2), I want to create a payment on a user's behalf.\nAs an operator, I want to check service health without authenticating.\n"
 }

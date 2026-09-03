@@ -530,20 +530,8 @@
           - Example: "must be greater than 0"
 
 ### GhostSchema
-- ⚠️ unresolvable $ref → #/components/schemas/DoesNotExist
-
-### DoesNotExist
-- ⚠️ unresolvable $ref → #/components/schemas/DoesNotExist
+- Type: object
 
 ## User Stories
 
 (none provided)
-
-## Warnings
-
-- Unresolvable $ref: $.components.schemas.GhostSchema -> #/components/schemas/DoesNotExist
-
-## Broken $ref Summary
-
-- Total broken $ref occurrences: 1
-- Affected endpoints: 0

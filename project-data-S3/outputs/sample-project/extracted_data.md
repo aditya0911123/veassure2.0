@@ -49,12 +49,3 @@
 As a user, I want to list all pets so that I can see what's available.
 As a user, I want to view a pet's friend relationship.
 
-
-## Warnings
-
-- none
-
-## Broken $ref Summary
-
-- Total broken $ref occurrences: 0
-- Affected endpoints: 0
