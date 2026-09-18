@@ -1,0 +1,252 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bookstore API",
+    "version": "1.0.0",
+    "description": "A small, plain CRUD API with no composition, no broken refs, no recursion."
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "books",
+      "description": "Book catalog operations"
+    }
+  ],
+  "paths": {
+    "/books": {
+      "get": {
+        "operationId": "listBooks",
+        "summary": "List all books",
+        "tags": [
+          "books"
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of books",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "author": {
+                        "type": "string"
+                      },
+                      "publishedYear": {
+                        "type": "integer",
+                        "minimum": 1450
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "author"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createBook",
+        "summary": "Create a new book",
+        "tags": [
+          "books"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "author": {
+                    "type": "string"
+                  },
+                  "publishedYear": {
+                    "type": "integer",
+                    "minimum": 1450
+                  }
+                },
+                "required": [
+                  "title",
+                  "author"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Book created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "author": {
+                      "type": "string"
+                    },
+                    "publishedYear": {
+                      "type": "integer",
+                      "minimum": 1450
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "author"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{bookId}": {
+      "get": {
+        "operationId": "getBook",
+        "summary": "Get a single book",
+        "tags": [
+          "books"
+        ],
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The book",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "author": {
+                      "type": "string"
+                    },
+                    "publishedYear": {
+                      "type": "integer",
+                      "minimum": 1450
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "author"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteBook",
+        "summary": "Delete a book",
+        "tags": [
+          "books"
+        ],
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Book deleted"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Book": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "publishedYear": {
+            "type": "integer",
+            "minimum": 1450
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "author"
+        ]
+      },
+      "BookInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "publishedYear": {
+            "type": "integer",
+            "minimum": 1450
+          }
+        },
+        "required": [
+          "title",
+          "author"
+        ]
+      }
+    }
+  }
+}

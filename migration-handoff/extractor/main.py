@@ -1,13 +1,13 @@
-"""Part 2 entry point: pick a project, run Hard Gates, then extract
-deterministic data from swagger.json (+ optional userstories.txt) into
-project-data-S3/outputs/<project-name>/extracted_data.json and .md. The
-fully resolved document returned by Prance is also saved separately to
-project-data-S3/prance-outputs/<project-name>/prance_resolved_swagger.json
-for inspection. One subfolder per project prevents one run overwriting
-another project's artifacts.
+"""Pure extraction logic: given swagger.json (+ optional userstories.txt),
+deterministically extract metadata, security, endpoints, and schemas.
 
-Usage:
-    python -m extractor.main
+NOTE (migration-handoff): the original file this was copied from also had
+an interactive main()/CLI entry point that picked a project folder via
+ingestion_service.project_picker and wrote extracted_data.json/.md to disk.
+That CLI wiring was stripped here on purpose - an orchestrator agent
+supplies the input path itself and decides what to do with the result, so
+there's nothing for an interactive project picker to do in this system.
+run_extraction() below is the only function meant to be wrapped as a tool.
 """
 
 from __future__ import annotations
@@ -15,9 +15,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Callable
-
-from ingestion_service.hard_gates import format_report, run_hard_gates
-from ingestion_service.project_picker import prompt_for_project
 
 from .endpoint_extraction import extract_endpoints
 from .md_generation import generate_markdown
@@ -28,10 +25,6 @@ from .ref_resolution import (
     resolve_with_prance,
 )
 from .schema_extraction import extract_schemas
-
-INPUTS_DIR = Path("project-data-S3") / "inputs"
-OUTPUTS_DIR = Path("project-data-S3") / "outputs"
-PRANCE_OUTPUTS_DIR = Path("project-data-S3") / "prance-outputs"
 
 
 def _extract_metadata(spec: dict[str, Any]) -> dict[str, Any]:
@@ -128,49 +121,8 @@ def run_extraction(
     return data, raw_spec, ref_status, broken_refs
 
 
-def main() -> int:
-    print("Step 1/4: Selecting project...")
-    project = prompt_for_project(INPUTS_DIR)
-    if project is None:
-        return 1
-
-    print(f"\nStep 2/4: Running Hard Gates on {project.swagger_path}...")
-    gate_result = run_hard_gates(project.swagger_path)
-    print(format_report(gate_result))
-    if not gate_result.overall_pass:
-        print("\nHard Gates failed - stopping before extraction.")
-        return 1
-
-    print("\nStep 3/4: Resolving references and extracting data...")
-    project_prance_dir = PRANCE_OUTPUTS_DIR / project.name
-    project_prance_dir.mkdir(parents=True, exist_ok=True)
-    prance_path = project_prance_dir / "prance_resolved_swagger.json"
-
-    def save_prance_output(resolved_spec: dict[str, Any]) -> None:
-        prance_path.write_text(json.dumps(resolved_spec, indent=2), encoding="utf-8")
-        print(f"  Wrote Prance-resolved document: {prance_path}")
-
-    data, raw_spec, ref_status, broken_refs = run_extraction(
-        project.swagger_path, project.userstories_path, on_prance_resolved=save_prance_output
-    )
-    if broken_refs:
-        print(f"  Collected {len(broken_refs)} broken-ref detail(s) for Part 3 (not written to output files).")
-
-    print("\nStep 4/4: Writing output files...")
-    project_outputs_dir = OUTPUTS_DIR / project.name
-    project_outputs_dir.mkdir(parents=True, exist_ok=True)
-
-    json_path = project_outputs_dir / "extracted_data.json"
-    json_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    print(f"  Wrote {json_path}")
-
-    md_path = project_outputs_dir / "extracted_data.md"
-    md_path.write_text(generate_markdown(data), encoding="utf-8")
-    print(f"  Wrote {md_path}")
-
-    print("\nDone.")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+# generate_markdown(data) from .md_generation turns the extracted_data dict
+# from run_extraction() above into a human-readable Markdown mirror - also
+# pure/deterministic, no I/O. Kept imported here for convenience since it's
+# the natural pairing with run_extraction's output; call it directly if a
+# Markdown artifact is wanted alongside the dict.
